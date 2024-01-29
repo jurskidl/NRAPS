@@ -34,20 +34,21 @@ fn find_in_file<'a>(
         (0, 1, 1, 1, 1, 1, 1, 1, 1.0, 1.0, 1, 1);
 
     for line in reader.lines() {
-        let line = line.unwrap().to_ascii_lowercase();
-        //.retain(|c| !c.is_whitespace());
+        let line: String = line.unwrap().to_ascii_lowercase();
 
-        // if line.starts_with("#") || line.is_empty(){
+        // if line.starts_with("#") || line.is_empty() {
         //     continue;
-        // }else {
-        //     let line = line.filter(|c| !c.is_whitespace());
-        //     let parsed = line.split("=");
+        // } else if line.contains("=") {
+        //     let split_line: Vec<&str> = line.split("=").collect();
+        //     match split_line[0].trim() {
+        //         "solution" => split_line[1].parse::<u8>().unwrap(),
+        //     }
         // }
         if line.starts_with("#") || line.is_empty() {
             continue;
         } else if line.contains("solution") && line.contains("=") {
             let words = line
-                .split_whitespace()
+                .split("=")
                 .map(|s| s.to_owned())
                 .collect::<Vec<String>>();
 
