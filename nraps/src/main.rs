@@ -10,261 +10,80 @@ pub enum Solver {
     Sor,
 }
 
-fn find_in_file<'a>(
-    file_path: &str,
-) -> Result<(u8, u8, u8, u32, u32, u16, u8, u8, f64, f64, u8, u8), Box<dyn std::error::Error>> {
+struct Variables {
+    solution: u8,
+    analk: u8,
+    energygroups: u8,
+    solver: Solver,
+    generations: u32,
+    histories: u32,
+    skip: u16,
+    numass: u8,
+    numrods: u8,
+    roddia: f64,
+    rodpitch: f64,
+    mpfr: u8,
+    mpwr: u8,
+}
+
+fn find_in_file(file_path: &str) -> Result<Variables, Box<dyn std::error::Error>> {
     let file = File::open(file_path).expect("Unable to open the specified file");
     let reader = BufReader::new(file);
 
     // Initialize the values necessary for use later
-    let (
-        mut solution,
-        mut analk,
-        mut energygroups,
-        mut generations,
-        mut histories,
-        mut skip,
-        mut numass,
-        mut numrods,
-        mut roddia,
-        mut rodpitch,
-        mut mpfr,
-        mut mpwr,
-    ): (u8, u8, u8, u32, u32, u16, u8, u8, f64, f64, u8, u8) =
-        (0, 1, 1, 1, 1, 1, 1, 1, 1.0, 1.0, 1, 1);
+    //let mut variables = Variables{solution: 0, analk: 1, energygroups: 1, generations: 1, histories: 1, skip: 1, numass: 1, numrods: 1, roddia: 1.0, rodpitch: 1.0, mpfr: 1, mpwr: 1};
+    let variables: Variables;
 
     for line in reader.lines() {
+
         let line: String = line.unwrap().to_ascii_lowercase();
 
-        // if line.starts_with("#") || line.is_empty() {
-        //     continue;
-        // } else if line.contains("=") {
-        //     let split_line: Vec<&str> = line.split("=").collect();
-        //     match split_line[0].trim() {
-        //         "solution" => split_line[1].parse::<u8>().unwrap(),
-        //     }
-        // }
-        if line.starts_with("#") || line.is_empty() {
+        if !line.starts_with("#") && !line.is_empty() && line.contains("="){
+            let split_line = line.split("=").map(|s| s.to_owned()).collect::<Vec<String>>();
+            match split_line[0].trim() {
+                "solution" => variables.solution = split_line[1].trim().parse::<u8>().unwrap(),
+                "analk" => variables.analk = split_line[1].trim().parse::<u8>().unwrap(),
+                "energygroups" => variables.energygroups = split_line[1].trim().parse::<u8>().unwrap(),
+                "solver" => variables.solver = match split_line[1].trim() {
+                    "1" => Solver::Gaussian,
+                    "2" => Solver::Jacobian,
+                    "3" => Solver::Sor,
+                    _ => Solver::LinAlg,
+                },
+                "generations" => variables.generations = split_line[1].trim().parse::<u32>().unwrap(),
+                "histories" => variables.histories = split_line[1].trim().parse::<u32>().unwrap(),
+                "skip" => variables.skip = split_line[1].trim().parse::<u16>().unwrap(),
+                "numass" => variables.numass = split_line[1].trim().parse::<u8>().unwrap(),
+                "numrods" => variables.numrods = split_line[1].trim().parse::<u8>().unwrap(),
+                "roddia" => variables.roddia = split_line[1].trim().parse::<f64>().unwrap(),
+                "rodpitch" => variables.rodpitch = split_line[1].trim().parse::<f64>().unwrap(),
+                "mpfr" => variables.mpfr = split_line[1].trim().parse::<u8>().unwrap(),
+                "mpwr" => variables.mpwr = split_line[1].trim().parse::<u8>().unwrap(),
+                _ => continue
+            }
+        } else {
             continue;
-        } else if line.contains("solution") && line.contains("=") {
-            let words = line
-                .split("=")
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "solution").unwrap();
-            solution = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", solution);
-        } else if line.contains("testcase") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "testcase").unwrap();
-            let testcase = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", testcase);
-        } else if line.contains("configs") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "configs").unwrap();
-            let configs = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", configs);
-        } else if line.contains("config") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "config").unwrap();
-            let config = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", config);
-        } else if line.contains("analk") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "analk").unwrap();
-            analk = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", analk);
-        } else if line.contains("cases") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "cases").unwrap();
-            let cases = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", cases);
-        } else if line.contains("mattypes") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "mattypes").unwrap();
-            let mattypes = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", mattypes);
-        } else if line.contains("energygroups") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "energygroups").unwrap();
-            energygroups = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", energygroups);
-        } else if line.contains("solver") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "solver").unwrap();
-            let solver = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", solver);
-        } else if line.contains("generations") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "generations").unwrap();
-            generations = words[index + 2].parse::<u32>().unwrap();
-            print!("{}\n", generations);
-        } else if line.contains("histories") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "histories").unwrap();
-            histories = words[index + 2].parse::<u32>().unwrap();
-            print!("{}\n", histories);
-        } else if line.contains("skip") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "skip").unwrap();
-            skip = words[index + 2].parse::<u16>().unwrap();
-            print!("{}\n", skip);
-        } else if line.contains("numass") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "numass").unwrap();
-            numass = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", numass);
-        } else if line.contains("numrods") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "numrods").unwrap();
-            numrods = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", numrods);
-        } else if line.contains("roddia") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "roddia").unwrap();
-            roddia = words[index + 2].parse::<f64>().unwrap();
-            print!("{}\n", roddia);
-        } else if line.contains("rodpitch") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "rodpitch").unwrap();
-            rodpitch = words[index + 2].parse::<f64>().unwrap();
-            print!("{}\n", rodpitch);
-        } else if line.contains("mpfr") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "mpfr").unwrap();
-            mpfr = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", mpfr);
-        } else if line.contains("mpwr") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "mpwr").unwrap();
-            mpwr = words[index + 2].parse::<u8>().unwrap();
-            print!("{}\n", mpwr);
-        } else if line.contains("boundl") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "boundl").unwrap();
-            let boundl = words[index + 2].parse::<f64>().unwrap(); // need to change this to save both values to a vector
-            print!("{}\n", boundl);
-        } else if line.contains("boundr") && line.contains("=") {
-            let words = line
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-
-            let index = words.iter().position(|x| x == "boundr").unwrap();
-            let boundr = words[index + 2].parse::<f64>().unwrap(); // need to change this to save both values to a vector
-            print!("{}\n", boundr);
         }
 
         // Will add ability to read specific cross section required
         // Will add ability to read specific configuration required
     }
+    // match variables.solver {
+    //         Solver::LinAlg => println!("Solve using LinAlg"),
+    //         Solver::Gaussian => println!("Solve using Gaussian"),
+    //         Solver::Jacobian => println!("Solve using Jaconian"),
+    //         Solver::Sor => println!("Solve using Sor"),
+    //     }
 
-    return Ok((
-        solution,
-        analk,
-        energygroups,
-        generations,
-        histories,
-        skip,
-        numass,
-        numrods,
-        roddia,
-        rodpitch,
-        mpfr,
-        mpwr,
-    ));
+    // print!("{}\n",variables.solution);
+
+    return Ok(variables);
 }
 
 fn main() {
     let file_path = "../SampleInputFile.txt";
 
-    let (
-        solution,
-        analk,
-        energygroups,
-        generations,
-        histories,
-        skip,
-        numass,
-        numrods,
-        roddia,
-        rodpitch,
-        mpfr,
-        mpwr,
-    ) = find_in_file(file_path).unwrap();
+    let _variables = find_in_file(&file_path).unwrap();
 
     println!("In file {}", file_path);
 
