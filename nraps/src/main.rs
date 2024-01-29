@@ -37,6 +37,12 @@ fn find_in_file<'a>(
         let line = line.unwrap().to_ascii_lowercase();
         //.retain(|c| !c.is_whitespace());
 
+        // if line.starts_with("#") || line.is_empty(){
+        //     continue;
+        // }else {
+        //     let line = line.filter(|c| !c.is_whitespace());
+        //     let parsed = line.split("=");
+        // }
         if line.starts_with("#") || line.is_empty() {
             continue;
         } else if line.contains("solution") && line.contains("=") {
