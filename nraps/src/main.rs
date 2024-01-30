@@ -100,21 +100,21 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
     let mut xsdata_flag: bool = false;
 
     for line in reader.lines() {
-        let line: String = line.unwrap();
+        let line: String = line
+            .unwrap()
+            .to_ascii_lowercase();
 
         if !line.starts_with("#") && line.contains("=") && xsdata_flag == false {
-            let split_line: Vec<String> = line
-                .to_ascii_lowercase()
-                .split("=")
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-            match split_line[0].trim() {
-                "solution" => variables.solution = split_line[1].trim().parse::<u8>().unwrap(),
-                "testcase" => case = split_line[1].trim().parse::<u8>().unwrap(),
-                "analk" => variables.analk = split_line[1].trim().parse::<u8>().unwrap(),
-                "energygroups" => variables.energygroups = split_line[1].trim().parse::<u8>().unwrap(),
+            let (vars_name, vars_value) = line
+                .split_once("=")
+                .unwrap();
+            match vars_name.trim() {
+                "solution" => variables.solution = vars_value.trim().parse::<u8>().unwrap(),
+                "testcase" => case = vars_value.trim().parse::<u8>().unwrap(),
+                "analk" => variables.analk = vars_value.trim().parse::<u8>().unwrap(),
+                "energygroups" => variables.energygroups = vars_value.trim().parse::<u8>().unwrap(),
                 "solver" => {
-                    variables.solver = match split_line[1].trim() {
+                    variables.solver = match vars_value.trim() {
                         "1" => Solver::Gaussian,
                         "2" => Solver::Jacobian,
                         "3" => Solver::Sor,
@@ -122,20 +122,20 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
                     }
                 }
                 "generations" => {
-                    variables.generations = split_line[1].trim().parse::<u32>().unwrap()
+                    variables.generations = vars_value.trim().parse::<u32>().unwrap()
                 }
-                "histories" => variables.histories = split_line[1].trim().parse::<u32>().unwrap(),
-                "skip" => variables.skip = split_line[1].trim().parse::<u16>().unwrap(),
-                "numass" => variables.numass = split_line[1].trim().parse::<u8>().unwrap(),
-                "numrods" => variables.numrods = split_line[1].trim().parse::<u8>().unwrap(),
-                "roddia" => variables.roddia = split_line[1].trim().parse::<f64>().unwrap(),
-                "rodpitch" => variables.rodpitch = split_line[1].trim().parse::<f64>().unwrap(),
-                "mpfr" => variables.mpfr = split_line[1].trim().parse::<u8>().unwrap(),
-                "mpwr" => variables.mpwr = split_line[1].trim().parse::<u8>().unwrap(),
-                "boundl" => variables.boundl = split_line[1].trim().parse::<f64>().unwrap(),
-                "boundr" => variables.boundr = split_line[1].trim().parse::<f64>().unwrap(),
+                "histories" => variables.histories = vars_value.trim().parse::<u32>().unwrap(),
+                "skip" => variables.skip = vars_value.trim().parse::<u16>().unwrap(),
+                "numass" => variables.numass = vars_value.trim().parse::<u8>().unwrap(),
+                "numrods" => variables.numrods = vars_value.trim().parse::<u8>().unwrap(),
+                "roddia" => variables.roddia = vars_value.trim().parse::<f64>().unwrap(),
+                "rodpitch" => variables.rodpitch = vars_value.trim().parse::<f64>().unwrap(),
+                "mpfr" => variables.mpfr = vars_value.trim().parse::<u8>().unwrap(),
+                "mpwr" => variables.mpwr = vars_value.trim().parse::<u8>().unwrap(),
+                "boundl" => variables.boundl = vars_value.trim().parse::<f64>().unwrap(),
+                "boundr" => variables.boundr = vars_value.trim().parse::<f64>().unwrap(),
                 "case" => {
-                    if split_line[1].trim().parse::<u8>().unwrap() == case {
+                    if vars_value.trim().parse::<u8>().unwrap() == case {
                             xsdata_flag = true;
                         } else {
                             xsdata_flag = false;
