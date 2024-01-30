@@ -26,38 +26,39 @@ struct Variables {
     mpwr: u8,
 }
 
-fn find_in_file(file_path: &str) -> Result<Variables, Box<dyn std::error::Error>> {
+fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error>> {
     let file = File::open(file_path).expect("Unable to open the specified file");
     let reader = BufReader::new(file);
 
     // Initialize the values necessary for use later
-    // let mut variables = Variables {
-    //     solution: 0,
-    //     analk: 1,
-    //     energygroups: 1,
-    //     solver: Solver::LinAlg,
-    //     generations: 1,
-    //     histories: 1,
-    //     skip: 1,
-    //     numass: 1,
-    //     numrods: 1,
-    //     roddia: 1.0,
-    //     rodpitch: 1.0,
-    //     mpfr: 1,
-    //     mpwr: 1,
-    // };
-    let variables: Variables;
+    let mut variables = Variables {
+        solution: 0,
+        analk: 1,
+        energygroups: 1,
+        solver: Solver::LinAlg,
+        generations: 1,
+        histories: 1,
+        skip: 1,
+        numass: 1,
+        numrods: 1,
+        roddia: 1.0,
+        rodpitch: 1.0,
+        mpfr: 1,
+        mpwr: 1,
+    };
+    let mut case = "0";
 
     for line in reader.lines() {
         let line: String = line.unwrap().to_ascii_lowercase();
 
-        if !line.starts_with("#") && !line.is_empty() && line.contains("=") {
+        if !line.starts_with("#") && line.contains("=") {
             let split_line: Vec<String> = line
                 .split("=")
                 .map(|s| s.to_owned())
                 .collect::<Vec<String>>();
             match split_line[0].trim() {
                 "solution" => variables.solution = split_line[1].trim().parse::<u8>().unwrap(),
+                "testcase" => case = split_line[1].trim(),
                 "analk" => variables.analk = split_line[1].trim().parse::<u8>().unwrap(),
                 "energygroups" => {
                     variables.energygroups = split_line[1].trim().parse::<u8>().unwrap()
@@ -85,14 +86,13 @@ fn find_in_file(file_path: &str) -> Result<Variables, Box<dyn std::error::Error>
             }
         }
     }
-
     return Ok(variables);
 }
 
 fn main() {
     let file_path = "../SampleInputFile.txt";
 
-    let _variables = find_in_file(&file_path).unwrap();
+    let _variables = process_input(&file_path).unwrap();
 
     println!("In file {}", file_path);
 
