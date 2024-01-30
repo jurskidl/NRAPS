@@ -29,13 +29,13 @@ struct Variables {
 }
 
 struct XSData {
-    sigtr: f64,
-    sigis: f64,
-    sigds: f64,
-    siga: f64,
-    sigf: f64,
-    nut: f64,
-    chit: f64,
+    sigtr: Vec<f64>,
+    sigis: Vec<f64>,
+    sigds: Vec<f64>,
+    siga: Vec<f64>,
+    sigf: Vec<f64>,
+    nut: Vec<f64>,
+    chit: Vec<f64>,
 }
 
 fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error>> {
@@ -61,40 +61,40 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
         boundr: 1.0
     };
     let mut uo2 = XSData{
-        sigtr: 1.0,
-        sigis: 1.0,
-        sigds: 1.0,
-        siga: 1.0,
-        sigf: 1.0,
-        nut: 1.0,
-        chit: 1.0,
+        sigtr: Vec::new(),
+        sigis: Vec::new(),
+        sigds: Vec::new(),
+        siga: Vec::new(),
+        sigf: Vec::new(),
+        nut: Vec::new(),
+        chit: Vec::new(),
     };
     let mut mox = XSData{
-        sigtr: 1.0,
-        sigis: 1.0,
-        sigds: 1.0,
-        siga: 1.0,
-        sigf: 1.0,
-        nut: 1.0,
-        chit: 1.0,
+        sigtr: Vec::new(),
+        sigis: Vec::new(),
+        sigds: Vec::new(),
+        siga: Vec::new(),
+        sigf: Vec::new(),
+        nut: Vec::new(),
+        chit: Vec::new(),
     };
     let mut h2o = XSData{
-        sigtr: 1.0,
-        sigis: 1.0,
-        sigds: 1.0,
-        siga: 1.0,
-        sigf: 1.0,
-        nut: 1.0,
-        chit: 1.0,
+        sigtr: Vec::new(),
+        sigis: Vec::new(),
+        sigds: Vec::new(),
+        siga: Vec::new(),
+        sigf: Vec::new(),
+        nut: Vec::new(),
+        chit: Vec::new(),
     };
     let mut cr = XSData{
-        sigtr: 1.0,
-        sigis: 1.0,
-        sigds: 1.0,
-        siga: 1.0,
-        sigf: 1.0,
-        nut: 1.0,
-        chit: 1.0,
+        sigtr: Vec::new(),
+        sigis: Vec::new(),
+        sigds: Vec::new(),
+        siga: Vec::new(),
+        sigf: Vec::new(),
+        nut: Vec::new(),
+        chit: Vec::new(),
     };
     let mut case: u8 = 0;
     let mut xsdata_flag: bool = false;
@@ -153,16 +153,20 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
                 .collect::<Vec<String>>();
             match split_line[0].trim() {
                 "sigtr" => {
-                    uo2.sigtr = split_line[2].parse::<f64>().unwrap();
-                    mox.sigtr = split_line[3].parse::<f64>().unwrap();
-                    h2o.sigtr = split_line[4].parse::<f64>().unwrap();
-                    cr.sigtr = split_line[5].parse::<f64>().unwrap();
+                    for index in 1..variables.energygroups{
+                        uo2.sigtr.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.sigtr.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigtr.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigtr.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
                 }
                 "sigis" => {
-                    uo2.sigis = split_line[2].parse::<f64>().unwrap();
-                    mox.sigis = split_line[3].parse::<f64>().unwrap();
-                    h2o.sigis = split_line[4].parse::<f64>().unwrap();
-                    cr.sigis = split_line[5].parse::<f64>().unwrap();
+                    for index in 1..variables.energygroups{
+                    uo2.sigis.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                    mox.sigis.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    h2o.sigis.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                    cr.sigis.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
                 }
                 "sigds" => {
                     uo2.sigds = split_line[2].parse::<f64>().unwrap();
