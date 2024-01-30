@@ -112,9 +112,7 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
                 "solution" => variables.solution = split_line[1].trim().parse::<u8>().unwrap(),
                 "testcase" => case = split_line[1].trim().parse::<u8>().unwrap(),
                 "analk" => variables.analk = split_line[1].trim().parse::<u8>().unwrap(),
-                "energygroups" => {
-                    variables.energygroups = split_line[1].trim().parse::<u8>().unwrap()
-                }
+                "energygroups" => variables.energygroups = split_line[1].trim().parse::<u8>().unwrap(),
                 "solver" => {
                     variables.solver = match split_line[1].trim() {
                         "1" => Solver::Gaussian,
@@ -151,59 +149,56 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
                 .split_whitespace()
                 .map(|s| s.to_owned())
                 .collect::<Vec<String>>();
-            match split_line[0].trim() {
-                "sigtr" => {
-                    for index in 1..variables.energygroups{
+            for index in 0..=variables.energygroups-1 {
+                match split_line[0].trim() {
+                    "sigtr" => {
+                        print!("{}\n",split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
                         uo2.sigtr.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
                         mox.sigtr.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
                         h2o.sigtr.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
                         cr.sigtr.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
                     }
-                }
-                "sigis" => {
-                    for index in 1..variables.energygroups{
-                    uo2.sigis.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                    mox.sigis.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                    h2o.sigis.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                    cr.sigis.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    "sigis" => {
+                        uo2.sigis.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.sigis.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigis.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigis.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
                     }
+                    "sigds" => {
+                        uo2.sigds.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.sigds.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigds.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigds.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                    "siga" => {
+                        uo2.siga.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.siga.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.siga.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.siga.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                    "sigf" => {
+                        uo2.sigf.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.sigf.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigf.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigf.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                    "nut" => {
+                        uo2.nut.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.nut.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.nut.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.nut.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                    "chit" => {
+                        uo2.chit.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        mox.chit.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.chit.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.chit.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                    _ => xsdata_flag = false,
                 }
-                "sigds" => {
-                    uo2.sigds = split_line[2].parse::<f64>().unwrap();
-                    mox.sigds = split_line[3].parse::<f64>().unwrap();
-                    h2o.sigds = split_line[4].parse::<f64>().unwrap();
-                    cr.sigds = split_line[5].parse::<f64>().unwrap();
-                }
-                "siga" => {
-                    uo2.siga = split_line[2].parse::<f64>().unwrap();
-                    mox.siga = split_line[3].parse::<f64>().unwrap();
-                    h2o.siga = split_line[4].parse::<f64>().unwrap();
-                    cr.siga = split_line[5].parse::<f64>().unwrap();
-                }
-                "sigf" => {
-                    uo2.sigf = split_line[2].parse::<f64>().unwrap();
-                    mox.sigf = split_line[3].parse::<f64>().unwrap();
-                    h2o.sigf = split_line[4].parse::<f64>().unwrap();
-                    cr.sigf = split_line[5].parse::<f64>().unwrap();
-                }
-                "nut" => {
-                    uo2.nut = split_line[2].parse::<f64>().unwrap();
-                    mox.nut = split_line[3].parse::<f64>().unwrap();
-                    h2o.nut = split_line[4].parse::<f64>().unwrap();
-                    cr.nut = split_line[5].parse::<f64>().unwrap();
-                }
-                "chit" => {
-                    uo2.chit = split_line[2].parse::<f64>().unwrap();
-                    mox.chit = split_line[3].parse::<f64>().unwrap();
-                    h2o.chit = split_line[4].parse::<f64>().unwrap();
-                    cr.chit = split_line[5].parse::<f64>().unwrap();
-                }
-                _ => xsdata_flag = false,
             }
         }
-        //print!("{}\n", case);
     }
-    print!("{}\n",uo2.sigtr);
     return Ok(variables);
 }
 
