@@ -63,8 +63,8 @@ MPWR = 4
 # You have to specify the boundary conditions after you set the number of energy groups #
 # BoundL  = Left Boundary Condition                                                     #
 # BoundR  = Right Boundary Condition                                                    #
-BoundL = 1.0 1.0
-BoundR = 1.0 1.0
+BoundL = 1.0
+BoundR = 1.0
 
 #=======================================================================================#
 #                                                                                       #
