@@ -38,7 +38,7 @@ struct XSData {
     chit: Vec<f64>,
 }
 
-fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error>> {
+fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, XSData), Box<dyn std::error::Error>> {
     let file = File::open(file_path).expect("Unable to open the specified file");
     let reader = BufReader::new(file);
 
@@ -199,13 +199,13 @@ fn process_input(file_path: &str) -> Result<Variables, Box<dyn std::error::Error
             }
         }
     }
-    return Ok(variables);
+    return Ok((variables, uo2, mox, h2o, cr));
 }
 
 fn main() {
     let file_path = "../SampleInputFile.txt";
 
-    let _variables = process_input(&file_path).unwrap();
+    let (_variables, _uo2, _mox, _h2o, _cr) = process_input(&file_path).unwrap();
 
     println!("In file {}", file_path);
 
