@@ -146,7 +146,7 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
                         mox.sigtr.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
                         h2o.sigtr.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
                         cr.sigtr.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                }
+                    }
                 }
                 "sigis" => {
                     let split_vars = vars_value
