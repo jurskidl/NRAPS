@@ -39,7 +39,7 @@ struct XSData {
     chit: Vec<f64>,
 }
 
-fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, XSData), Box<dyn std::error::Error>> {
+fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, XSData, Vec<u8>), Box<dyn std::error::Error>> {
     let file = File::open(file_path).expect("Unable to open the specified file");
     let reader = BufReader::new(file);
 
@@ -99,6 +99,8 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
         chit: Vec::new(),
     };
 
+    let mut materials: Vec<u8> = vec![];
+
     for line in reader.lines() {
         let line: String = line
             .unwrap()
@@ -144,7 +146,7 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
                         mox.sigtr.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
                         h2o.sigtr.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
                         cr.sigtr.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
+                }
                 }
                 "sigis" => {
                     let split_vars = vars_value
@@ -218,17 +220,25 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
                         cr.chit.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
                     }
                 }
+                "matid" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                for index in 0..split_vars.len() {
+                materials.push(split_vars[index].parse::<u8>().unwrap());}
+                }
                 _ => continue,
             }
         }
     }
-    return Ok((variables, uo2, mox, h2o, cr));
+    return Ok((variables, uo2, mox, h2o, cr,materials));
 }
 
 fn main() {
     let file_path = "../SampleInputFile.txt";
 
-    let (_variables, _uo2, _mox, _h2o, _cr) = process_input(&file_path).unwrap();
+    let (_variables, _uo2, _mox, _h2o, _cr, _materials) = process_input(&file_path).unwrap();
 
     println!("In file {}", file_path);
 
