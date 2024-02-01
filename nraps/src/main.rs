@@ -12,6 +12,7 @@ pub enum Solver {
 
 struct Variables {
     solution: u8,
+    testcase: u8,
     analk: u8,
     energygroups: u8,
     solver: Solver,
@@ -45,6 +46,7 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
     // Initialize the values necessary for use later
     let mut variables = Variables {
         solution: 0,
+        testcase: 0,
         analk: 1,
         energygroups: 1,
         solver: Solver::LinAlg,
@@ -96,21 +98,19 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
         nut: Vec::new(),
         chit: Vec::new(),
     };
-    let mut case: u8 = 0;
-    let mut xsdata_flag: bool = false;
 
     for line in reader.lines() {
         let line: String = line
             .unwrap()
             .to_ascii_lowercase();
 
-        if !line.starts_with("#") && line.contains("=") && xsdata_flag == false {
+        if !line.starts_with("#") && line.contains("=") {
             let (vars_name, vars_value) = line
                 .split_once("=")
                 .unwrap();
             match vars_name.trim() {
                 "solution" => variables.solution = vars_value.trim().parse::<u8>().unwrap(),
-                "testcase" => case = vars_value.trim().parse::<u8>().unwrap(),
+                "testcase" => variables.testcase = vars_value.trim().parse::<u8>().unwrap(),
                 "analk" => variables.analk = vars_value.trim().parse::<u8>().unwrap(),
                 "energygroups" => variables.energygroups = vars_value.trim().parse::<u8>().unwrap(),
                 "solver" => {
@@ -134,68 +134,91 @@ fn process_input(file_path: &str) -> Result<(Variables,XSData, XSData, XSData, X
                 "mpwr" => variables.mpwr = vars_value.trim().parse::<u8>().unwrap(),
                 "boundl" => variables.boundl = vars_value.trim().parse::<f64>().unwrap(),
                 "boundr" => variables.boundr = vars_value.trim().parse::<f64>().unwrap(),
-                "case" => {
-                    if vars_value.trim().parse::<u8>().unwrap() == case {
-                            xsdata_flag = true;
-                        } else {
-                            xsdata_flag = false;
-                        }
+                "sigtr" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.sigtr.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.sigtr.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigtr.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigtr.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
                     }
-                _ => continue,
-            }
-        } else if !line.starts_with("#") && line.contains("=") && xsdata_flag == true {
-            let split_line = line
-                .to_ascii_lowercase()
-                .split_whitespace()
-                .map(|s| s.to_owned())
-                .collect::<Vec<String>>();
-            for index in 0..=variables.energygroups-1 {
-                match split_line[0].trim() {
-                    "sigtr" => {
-                        print!("{}\n",split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        uo2.sigtr.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.sigtr.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.sigtr.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.sigtr.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    "sigis" => {
-                        uo2.sigis.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.sigis.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.sigis.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.sigis.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    "sigds" => {
-                        uo2.sigds.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.sigds.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.sigds.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.sigds.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    "siga" => {
-                        uo2.siga.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.siga.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.siga.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.siga.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    "sigf" => {
-                        uo2.sigf.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.sigf.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.sigf.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.sigf.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    "nut" => {
-                        uo2.nut.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.nut.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.nut.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.nut.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    "chit" => {
-                        uo2.chit.push(split_line[(2+(index*4)) as usize].parse::<f64>().unwrap());
-                        mox.chit.push(split_line[(3+(index*4)) as usize].parse::<f64>().unwrap());
-                        h2o.chit.push(split_line[(4+(index*4)) as usize].parse::<f64>().unwrap());
-                        cr.chit.push(split_line[(5+(index*4)) as usize].parse::<f64>().unwrap());
-                    }
-                    _ => xsdata_flag = false,
                 }
+                "sigis" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.sigis.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.sigis.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigis.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigis.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                }
+                "sigds" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.sigds.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.sigds.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigds.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigds.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                }
+                "siga" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.siga.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.siga.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.siga.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.siga.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                }
+                "sigf" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.sigf.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.sigf.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.sigf.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.sigf.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                }
+                "nut" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.nut.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.nut.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.nut.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.nut.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                }
+                "chit" => {
+                    let split_vars = vars_value
+                    .split_whitespace()
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>();
+                    for index in 0..=variables.energygroups-1 {
+                        uo2.chit.push(split_vars[(index*4) as usize].parse::<f64>().unwrap());
+                        mox.chit.push(split_vars[(1+(index*4)) as usize].parse::<f64>().unwrap());
+                        h2o.chit.push(split_vars[(2+(index*4)) as usize].parse::<f64>().unwrap());
+                        cr.chit.push(split_vars[(3+(index*4)) as usize].parse::<f64>().unwrap());
+                    }
+                }
+                _ => continue,
             }
         }
     }

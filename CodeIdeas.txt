@@ -1,5 +1,0 @@
-use a map function to pull all lines that contain an "=" sign
-save variables to local variable of same name
-pass into struct with local variables
-repeat for cross section datar
-repeat for materials
