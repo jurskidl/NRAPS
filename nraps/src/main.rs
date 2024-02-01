@@ -48,6 +48,10 @@ fn process_input() {
     .filter(|x| !x.starts_with("#") && x.contains("="))
     .collect();
 
+    //let (vars_names, vars_values) = lines.lock().lines().into_iter().map(|x| x.split_once("=").unwrap());
+
+    // let test = lines.lines().map(|x| x.unwrap().split_once("=").map()).collect();
+
     for index in 0..lines.len() {
         println!("{}", lines[index]);
     }
