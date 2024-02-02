@@ -1,7 +1,4 @@
-use std::{
-    fs,
-    io::BufRead,
-};
+use std::{fs, io::BufRead};
 
 pub enum Solver {
     LinAlg,
@@ -42,19 +39,18 @@ struct XSData {
 fn process_input() {
     let file = fs::read("../SampleInputFile.txt").expect("Unable to read the file");
     let lines: Vec<String> = file
-    .lines()
-    .map(|x| x.expect("Unable to read line").trim()
-    .to_ascii_lowercase())
-    .filter(|x| !x.starts_with("#") && x.contains("="))
-    .collect();
+        .lines()
+        .map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase())
+        .filter(|x| !x.starts_with("#") && x.contains("="))
+        .collect();
 
-    //let (vars_names, vars_values) = lines.lock().lines().into_iter().map(|x| x.split_once("=").unwrap());
+    // let (var_names, var_values) = split_vars(lines);
+    let (_var_names, _var_values): (Vec<&str>, Vec<&str>) =
+        lines.iter().map(|x| x.split_once("=").unwrap()).unzip();
 
-    // let test = lines.lines().map(|x| x.unwrap().split_once("=").map()).collect();
-
-    for index in 0..lines.len() {
-        println!("{}", lines[index]);
-    }
+    // for index in 0.._var_names.len() {
+    //     println!("{}", _var_names[index]);
+    // }
 }
 
 fn main() {
