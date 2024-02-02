@@ -36,7 +36,7 @@ struct XSData {
     chit: Vec<f64>,
 }
 
-fn process_input() {
+fn process_input() -> (Variables,XSData, XSData, XSData, XSData) {
     let file = fs::read("../SampleInputFile.txt").expect("Unable to read the file");
     let lines: Vec<String> = file
         .lines()
@@ -75,6 +75,50 @@ fn process_input() {
         boundr: var_values[positions[15]].trim().parse().unwrap(),
     };
 
+    let mattypes: u8 = var_values[positions[23]].trim().parse::<u8>().unwrap();
+
+    let (sigtr, sigis, sigds, siga, sigf, nut, chit) = xsdata_processor(var_values, positions);
+
+    let uo2 = XSData {
+        sigtr: (0..variables.energygroups).into_iter().map(|x: u8| sigtr[(mattypes*x) as usize]).collect(),
+        sigis: (0..variables.energygroups).into_iter().map(|x: u8| sigis[(mattypes*x) as usize]).collect(),
+        sigds: (0..variables.energygroups).into_iter().map(|x: u8| sigds[(mattypes*x) as usize]).collect(),
+        siga: (0..variables.energygroups).into_iter().map(|x: u8| siga[(mattypes*x) as usize]).collect(),
+        sigf: (0..variables.energygroups).into_iter().map(|x: u8| sigf[(mattypes*x) as usize]).collect(),
+        nut: (0..variables.energygroups).into_iter().map(|x: u8| nut[(mattypes*x) as usize]).collect(),
+        chit: (0..variables.energygroups).into_iter().map(|x: u8| chit[(mattypes*x) as usize]).collect(),
+    };
+
+    let mox = XSData {
+        sigtr: (0..variables.energygroups).into_iter().map(|x: u8| sigtr[((mattypes*x)+1) as usize]).collect(),
+        sigis: (0..variables.energygroups).into_iter().map(|x: u8| sigis[((mattypes*x)+1) as usize]).collect(),
+        sigds: (0..variables.energygroups).into_iter().map(|x: u8| sigds[((mattypes*x)+1) as usize]).collect(),
+        siga: (0..variables.energygroups).into_iter().map(|x: u8| siga[((mattypes*x)+1) as usize]).collect(),
+        sigf: (0..variables.energygroups).into_iter().map(|x: u8| sigf[((mattypes*x)+1) as usize]).collect(),
+        nut: (0..variables.energygroups).into_iter().map(|x: u8| nut[((mattypes*x)+1) as usize]).collect(),
+        chit: (0..variables.energygroups).into_iter().map(|x: u8| chit[((mattypes*x)+1) as usize]).collect(),
+    };
+
+    let h2o = XSData {
+        sigtr: (0..variables.energygroups).into_iter().map(|x: u8| sigtr[((mattypes*x)+2) as usize]).collect(),
+        sigis: (0..variables.energygroups).into_iter().map(|x: u8| sigis[((mattypes*x)+2) as usize]).collect(),
+        sigds: (0..variables.energygroups).into_iter().map(|x: u8| sigds[((mattypes*x)+2) as usize]).collect(),
+        siga: (0..variables.energygroups).into_iter().map(|x: u8| siga[((mattypes*x)+2) as usize]).collect(),
+        sigf: (0..variables.energygroups).into_iter().map(|x: u8| sigf[((mattypes*x)+2) as usize]).collect(),
+        nut: (0..variables.energygroups).into_iter().map(|x: u8| nut[((mattypes*x)+2) as usize]).collect(),
+        chit: (0..variables.energygroups).into_iter().map(|x: u8| chit[((mattypes*x)+2) as usize]).collect(),
+    };
+
+    let cr = XSData {
+        sigtr: (0..variables.energygroups).into_iter().map(|x: u8| sigtr[((mattypes*x)+3) as usize]).collect(),
+        sigis: (0..variables.energygroups).into_iter().map(|x: u8| sigis[((mattypes*x)+3) as usize]).collect(),
+        sigds: (0..variables.energygroups).into_iter().map(|x: u8| sigds[((mattypes*x)+3) as usize]).collect(),
+        siga: (0..variables.energygroups).into_iter().map(|x: u8| siga[((mattypes*x)+3) as usize]).collect(),
+        sigf: (0..variables.energygroups).into_iter().map(|x: u8| sigf[((mattypes*x)+3) as usize]).collect(),
+        nut: (0..variables.energygroups).into_iter().map(|x: u8| nut[((mattypes*x)+3) as usize]).collect(),
+        chit: (0..variables.energygroups).into_iter().map(|x: u8| chit[((mattypes*x)+3) as usize]).collect(),
+    };
+
     // let indices = var_names
     //     .into_iter()
     //     .position(|x| x.contains(variable_names.iter().map(|x| x)).unwrap())
@@ -83,10 +127,12 @@ fn process_input() {
     for index in 0..lines.len() {
         println!("{}", lines[index]);
     }
+
+    (variables, uo2, mox, h2o, cr)
 }
 
 fn positions(vector: Vec<String>) -> Vec<usize> {
-    let variable_names: [&str; 23] = [
+    let variable_names: [&str; 24] = [
         "solution",
         "testcase",
         "analk",
@@ -110,6 +156,7 @@ fn positions(vector: Vec<String>) -> Vec<usize> {
         "sigf",
         "nut",
         "chit",
+        "mattypes",
     ];
 
     let mut positions: Vec<usize> = vec![];
@@ -125,6 +172,18 @@ fn positions(vector: Vec<String>) -> Vec<usize> {
     }
 
     positions
+}
+
+fn xsdata_processor(var_values: Vec<&str>, positions: Vec<usize>) -> (Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>,Vec<f64>){
+    let sigtr = var_values[positions[16]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+    let sigis = var_values[positions[17]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+    let sigds = var_values[positions[18]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+    let siga = var_values[positions[19]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+    let sigf = var_values[positions[20]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+    let nut = var_values[positions[21]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+    let chit = var_values[positions[22]].split_whitespace().map(|x| x.to_owned().parse::<f64>().unwrap()).collect::<Vec<f64>>();
+
+    (sigtr, sigis, sigds, siga, sigf, nut, chit)    
 }
 
 fn main() {
