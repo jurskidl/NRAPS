@@ -108,7 +108,6 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
             .map(|x| x.to_owned().parse::<f64>().unwrap())
             .collect::<Vec<f64>>(),
     };
-
     // index vector via mat# = matid[config#*numass*((2*numrods)+1)]
     let matid = get_mats(var_values, mat_pos);
 
@@ -173,7 +172,6 @@ fn get_mats(vector: Vec<&str>, mat_pos: Vec<usize>) -> Vec<u8> {
                 .map(|y| y.to_owned().parse::<u8>().unwrap())
                 .collect::<Vec<u8>>(),
         )
-    }
 
     let matid: Vec<u8> = temp.into_iter().flatten().collect::<Vec<u8>>();
     matid
