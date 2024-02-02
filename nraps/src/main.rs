@@ -44,9 +44,41 @@ fn process_input() {
         .filter(|x| !x.starts_with("#") && x.contains("="))
         .collect();
 
-    // let (var_names, var_values) = split_vars(lines);
-    let (_var_names, _var_values): (Vec<&str>, Vec<&str>) =
+    let (var_names, _var_values): (Vec<&str>, Vec<&str>) =
         lines.iter().map(|x| x.split_once("=").unwrap()).unzip();
+
+    let var_names: Vec<String> = var_names.into_iter().map(|x| x.to_string()).collect();
+
+    let variable_names: [&str; 23] = [
+        "solution",
+        "testcase",
+        "analk",
+        "energygroups",
+        "solver",
+        "generations",
+        "histories",
+        "skip",
+        "numass",
+        "numrods",
+        "roddia",
+        "rodpitch",
+        "mpfr",
+        "mpwr",
+        "boundl",
+        "boundr",
+        "sigtr",
+        "sigis",
+        "sigds",
+        "siga",
+        "sigf",
+        "nut",
+        "chit",
+    ];
+
+    // let indices = var_names
+    //     .into_iter()
+    //     .position(|x| x.contains(variable_names.iter().map(|x| x)).unwrap())
+    //     .collect();
 
     // for index in 0.._var_names.len() {
     //     println!("{}", _var_names[index]);
