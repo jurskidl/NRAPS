@@ -152,7 +152,6 @@ fn positions(vector: Vec<String>) -> (Vec<usize>, Vec<usize>) {
                 .position(|x| x.trim() == variable_names[index])
                 .unwrap(),
         );
-        //println!("{}", positions[index]);
     }
 
     let mat_pos = vector
@@ -182,7 +181,7 @@ fn get_mats(vector: Vec<&str>, mat_pos: Vec<usize>) -> Vec<u8> {
 fn main() {
     let file_path = "../SampleInputFile.txt";
 
-    process_input();
+    let (variables, xsdata, matid): (Variables, XSData, Vec<u8>) = process_input();
 
     println!("In file {}", file_path);
 }
