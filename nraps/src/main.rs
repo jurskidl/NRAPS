@@ -110,7 +110,7 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     };
 
     // index vector via mat# = matid[config#*numass*((2*numrods)+1)]
-    let matid = get_mats(var_values, mat_pos);
+    let matid: Vec<u8> = get_mats(var_values, mat_pos);
 
     (variables, xsdata, matid)
 }
