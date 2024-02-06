@@ -1,4 +1,5 @@
 use std::{fs, io::BufRead};
+use std::time::{Duration, SystemTime};
 
 pub enum Solver {
     LinAlg,
@@ -179,9 +180,14 @@ fn get_mats(vector: Vec<&str>, mat_pos: Vec<usize>) -> Vec<u8> {
 }
 
 fn main() {
-    let file_path = "../SampleInputFile.txt";
+    let now = SystemTime::now();
+    for zyn in 0..1000000{
+        let (variables, xsdata, matid): (Variables, XSData, Vec<u8>) = process_input();
+        print!("{}\n", zyn);
+    }
 
-    let (variables, xsdata, matid): (Variables, XSData, Vec<u8>) = process_input();
+    print!("{}", now.elapsed().unwrap().as_secs());
+    //let file_path = "../SampleInputFile.txt";
 
-    println!("In file {}", file_path);
+    //println!("In file {}", file_path);
 }
