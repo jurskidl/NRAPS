@@ -1,5 +1,10 @@
 use std::time::SystemTime;
+<<<<<<< Updated upstream
 use std::{fs, io::BufRead};
+=======
+use std::fs::File;
+use std::io::{BufReader, BufRead};
+>>>>>>> Stashed changes
 
 pub enum Solver {
     LinAlg,
@@ -39,12 +44,18 @@ struct XSData {
 }
 
 fn process_input() -> (Variables, XSData, Vec<u8>) {
+<<<<<<< Updated upstream
     let file = fs::read("../SampleInputFile.txt").expect("Unable to read the file");
     let lines: Vec<String> = file
         .lines()
         .map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase())
         .filter(|x| !x.starts_with("#") && x.contains("="))
         .collect();
+=======
+    let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
+    let reader = BufReader::new(file);
+    let lines: Vec<_> = reader.lines().map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase()).filter(|x| !x.starts_with("#") && x.contains("=")).collect();
+>>>>>>> Stashed changes
 
     let (var_names, var_values): (Vec<&str>, Vec<&str>) =
         lines.iter().map(|x| x.split_once("=").unwrap()).unzip();
@@ -190,4 +201,8 @@ fn main() {
     //let file_path = "../SampleInputFile.txt";
 
     //println!("In file {}", file_path);
+<<<<<<< Updated upstream
 }
+=======
+}
+>>>>>>> Stashed changes
