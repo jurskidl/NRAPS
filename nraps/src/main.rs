@@ -30,7 +30,7 @@ struct Variables {
     boundr: f64,
 }
 
-struct XSData {
+struct _XSData {
     sigtr: Vec<f64>,
     sigis: Vec<f64>,
     sigds: Vec<f64>,
@@ -40,48 +40,95 @@ struct XSData {
     chit: Vec<f64>,
 }
 
-fn process_input() {
+fn process_input() -> Variables {
     let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
     let reader = BufReader::new(file);
-    let lines: Vec<_> = reader.lines().map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase()).filter(|x| !x.starts_with("#") && x.contains("=") && x.contains("solution")).collect();
+    let lines: Vec<_> = reader
+        .lines()
+        .map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase())
+        .filter(|x| !x.starts_with("#") && x.contains("="))
+        .collect();
 
-    let vars =
-        lines.iter().map(|x| x.split_whitespace().unwrap()).collect::<HashMap<&str, &str>>();
+        let vars = lines.into_iter().map(|a| {
+            let (key, value) = a.split_once("=").unwrap();
+            (key.trim().to_string(), value.to_string())
+        }).collect::<HashMap<String,String>>();
 
-        println!("{}", vars.get("solution").unwrap().to_owned().parse::<u8>().unwrap());
+    // let vars =
+    //     lines.into_iter().map(|x| x.split_whitespace().unwrap()).collect::<HashMap<&str, &str>>();
 
-    // let variables = Variables {
-    //     solution: vars.get("solution ").unwrap().to_owned().parse().unwrap(),
-    //     testcase: vars.get("testcase ").unwrap().to_owned().parse().unwrap(),
-    //     analk: vars.get("analk ").unwrap().to_owned().parse().unwrap(),
-    //     mattypes: vars.get("mattypes ").unwrap().to_owned().parse().unwrap(),
-    //     energygroups: vars.get("energygroups ").unwrap().to_owned().parse().unwrap(),
-    //     solver: match vars.get("solver ").unwrap().to_owned().trim() {
-    //         "1" => Solver::Gaussian,
-    //         "2" => Solver::Jacobian,
-    //         "3" => Solver::Sor,
-    //         _ => Solver::LinAlg,
-    //     },
-    //     generations: vars.get("generations ").unwrap().to_owned().parse().unwrap(),
-    //     histories: vars.get("histories ").unwrap().to_owned().parse().unwrap(),
-    //     skip: vars.get("skip ").unwrap().to_owned().parse().unwrap(),
-    //     numass: vars.get("numass ").unwrap().to_owned().parse().unwrap(),
-    //     numrods: vars.get("numrods ").unwrap().to_owned().parse().unwrap(),
-    //     roddia: vars.get("roddia ").unwrap().to_owned().parse().unwrap(),
-    //     rodpitch: vars.get("rodpitch ").unwrap().to_owned().parse().unwrap(),
-    //     mpfr: vars.get("mpfr ").unwrap().to_owned().parse().unwrap(),
-    //     mpwr: vars.get("mpwr ").unwrap().to_owned().parse().unwrap(),
-    //     boundl: vars.get("boundl ").unwrap().to_owned().parse().unwrap(),
-    //     boundr: vars.get("boundr ").unwrap().to_owned().parse().unwrap(),
-    // };
+    // for val in vars.keys() {
+    //     println!("{val}");
+    // }
 
-    //variables
+    // print!("{}\n",vars.get("solution").unwrap().trim().parse::<u8>().unwrap());
+    // print!("{}\n",vars.get("testcase").unwrap());
+    // print!("{}\n",vars.get("analk").unwrap());
+    // print!("{}\n",vars.get("mattypes").unwrap());
+    // print!("{}\n",vars.get("energygroups").unwrap());
+    // print!("{}\n",vars.get("generations").unwrap());
+    // print!("{}\n",vars.get("histories").unwrap());
+    // print!("{}\n",vars.get("skip").unwrap());
+    // print!("{}\n",vars.get("numass").unwrap());
+    // print!("{}\n",vars.get("numrods").unwrap());
+    // print!("{}\n",vars.get("roddia").unwrap());
+    // print!("{}\n",vars.get("rodpitch").unwrap());
+    // print!("{}\n",vars.get("mpfr").unwrap());
+    // print!("{}\n",vars.get("mpwr").unwrap());
+    // print!("{}\n",vars.get("boundl").unwrap());
+    // print!("{}\n",vars.get("boundr").unwrap());
+    
+
+    let variables = Variables {
+        solution: vars.get("solution").unwrap().trim().parse().unwrap(),
+        testcase: vars.get("testcase").unwrap().trim().parse().unwrap(),
+        analk: vars.get("analk").unwrap().trim().parse().unwrap(),
+        mattypes: vars.get("mattypes").unwrap().trim().parse().unwrap(),
+        energygroups: vars.get("energygroups").unwrap().trim().parse().unwrap(),
+        solver: match vars.get("solver").unwrap().trim() {
+            "1" => Solver::Gaussian,
+            "2" => Solver::Jacobian,
+            "3" => Solver::Sor,
+            _ => Solver::LinAlg,
+        },
+        generations: vars.get("generations").unwrap().trim().parse().unwrap(),
+        histories: vars.get("histories").unwrap().trim().parse().unwrap(),
+        skip: vars.get("skip").unwrap().trim().parse().unwrap(),
+        numass: vars.get("numass").unwrap().trim().parse().unwrap(),
+        numrods: vars.get("numrods").unwrap().trim().parse().unwrap(),
+        roddia: vars.get("roddia").unwrap().trim().parse().unwrap(),
+        rodpitch: vars.get("rodpitch").unwrap().trim().parse().unwrap(),
+        mpfr: vars.get("mpfr").unwrap().trim().parse().unwrap(),
+        mpwr: vars.get("mpwr").unwrap().trim().parse().unwrap(),
+        boundl: vars.get("boundl").unwrap().trim().parse().unwrap(),
+        boundr: vars.get("boundr").unwrap().trim().parse().unwrap(),
+    };
+
+    // println!("{}\n", variables.solution);
+    // println!("{}\n", variables.testcase);
+    // println!("{}\n", variables.analk);
+    // println!("{}\n", variables.mattypes);
+    // println!("{}\n", variables.energygroups);
+    // println!("{}\n", variables.generations);
+    // println!("{}\n", variables.histories);
+    // println!("{}\n", variables.skip);
+    // println!("{}\n", variables.numass);
+    // println!("{}\n", variables.numrods);
+    // println!("{}\n", variables.roddia);
+    // println!("{}\n", variables.rodpitch);
+    // println!("{}\n", variables.mpfr);
+    // println!("{}\n", variables.mpwr);
+    // println!("{}\n", variables.boundl);
+    // println!("{}\n", variables.boundr);
+    
+
+    variables
 }
 
 fn main() {
     let now = SystemTime::now();
     for zyn in 0..1000000 {
-       process_input();
+        let variables = process_input();
         print!("{}\n", zyn);
     }
 
