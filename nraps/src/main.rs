@@ -1,6 +1,7 @@
 use std::time::SystemTime;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
+use std::collections::HashSet;
 
 pub enum Solver {
     LinAlg,
@@ -42,7 +43,7 @@ struct XSData {
 fn process_input() -> (Variables, XSData, Vec<u8>) {
     let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
     let reader = BufReader::new(file);
-    let lines: Vec<_> = reader.lines().map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase()).filter(|x| !x.starts_with("#") && x.contains("=")).collect();
+    let lines: HashSet<_> = reader.lines().map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase()).filter(|x| !x.starts_with("#") && x.contains("=")).collect();
 
     let (var_names, var_values): (Vec<&str>, Vec<&str>) =
         lines.iter().map(|x| x.split_once("=").unwrap()).unzip();
@@ -179,7 +180,7 @@ fn get_mats(vector: Vec<&str>, mat_pos: Vec<usize>) -> Vec<u8> {
 
 fn main() {
     let now = SystemTime::now();
-    for zyn in 0..10000 {
+    for zyn in 0..1000000 {
         let (variables, xsdata, matid): (Variables, XSData, Vec<u8>) = process_input();
         print!("{}\n", zyn);
     }
