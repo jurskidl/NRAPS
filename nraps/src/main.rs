@@ -46,7 +46,7 @@ fn process_input() {
     let lines: Vec<_> = reader.lines().map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase()).filter(|x| !x.starts_with("#") && x.contains("=") && x.contains("solution")).collect();
 
     let vars =
-        lines.iter().map(|x| x.split_whitespace().collect()).collect::<HashMap<&str, &str>>();
+        lines.iter().map(|x| x.split_whitespace().unwrap()).collect::<HashMap<&str, &str>>();
 
         println!("{}", vars.get("solution").unwrap().to_owned().parse::<u8>().unwrap());
 
