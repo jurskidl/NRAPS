@@ -131,16 +131,13 @@ fn main() {
 
     // below is for timing
     let now = SystemTime::now();
-    let since_the_epoch = now
-        .duration_since(UNIX_EPOCH)
-        .expect("Time went backwards");
 
     for zyn in 0..1000000 {
         let (variables, xsdata, matid) = process_input();
-        print!("{}\n", zyn);
+        print!("{}\n", zyn)
     }
 
-    print!("{}\n", since_the_epoch.as_millis());
+    print!("{}\n", now.elapsed().unwrap().as_secs());
 
     sleep(Duration::new(30, 0));
 }
