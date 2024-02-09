@@ -30,7 +30,7 @@ struct Variables {
     boundr: f64,
 }
 
-struct _XSData {
+struct XSData {
     sigtr: Vec<f64>,
     sigis: Vec<f64>,
     sigds: Vec<f64>,
@@ -40,44 +40,25 @@ struct _XSData {
     chit: Vec<f64>,
 }
 
-fn process_input() -> Variables {
+fn process_input() -> (Variables, XSData, Vec<u8>) {
     let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
     let reader = BufReader::new(file);
-    let lines: Vec<_> = reader
+    let lines: Vec<String> = reader
         .lines()
         .map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase())
         .filter(|x| !x.starts_with("#") && x.contains("="))
         .collect();
 
-        let vars = lines.into_iter().map(|a| {
-            let (key, value) = a.split_once("=").unwrap();
-            (key.trim().to_string(), value.to_string())
-        }).collect::<HashMap<String,String>>();
+    let (vector, hash): (Vec<String>, Vec<String>) = lines
+        .into_iter()
+        .partition(|x| x.contains("matid") || x.contains("sigtr") || x.contains("sigis") || x.contains("sigds") || x.contains("siga") || x.contains("sigf") || x.contains("nut") || x.contains("chit"));
 
-    // let vars =
-    //     lines.into_iter().map(|x| x.split_whitespace().unwrap()).collect::<HashMap<&str, &str>>();
+    let (matid, xsdata) = get_data(vector);
 
-    // for val in vars.keys() {
-    //     println!("{val}");
-    // }
-
-    // print!("{}\n",vars.get("solution").unwrap().trim().parse::<u8>().unwrap());
-    // print!("{}\n",vars.get("testcase").unwrap());
-    // print!("{}\n",vars.get("analk").unwrap());
-    // print!("{}\n",vars.get("mattypes").unwrap());
-    // print!("{}\n",vars.get("energygroups").unwrap());
-    // print!("{}\n",vars.get("generations").unwrap());
-    // print!("{}\n",vars.get("histories").unwrap());
-    // print!("{}\n",vars.get("skip").unwrap());
-    // print!("{}\n",vars.get("numass").unwrap());
-    // print!("{}\n",vars.get("numrods").unwrap());
-    // print!("{}\n",vars.get("roddia").unwrap());
-    // print!("{}\n",vars.get("rodpitch").unwrap());
-    // print!("{}\n",vars.get("mpfr").unwrap());
-    // print!("{}\n",vars.get("mpwr").unwrap());
-    // print!("{}\n",vars.get("boundl").unwrap());
-    // print!("{}\n",vars.get("boundr").unwrap());
-    
+    let vars = hash.into_iter().map(|a| {
+        let (key, value) = a.split_once("=").unwrap();
+        (key.trim().to_string(), value.to_string())
+    }).collect::<HashMap<String,String>>();
 
     let variables = Variables {
         solution: vars.get("solution").unwrap().trim().parse().unwrap(),
@@ -103,37 +84,96 @@ fn process_input() -> Variables {
         boundl: vars.get("boundl").unwrap().trim().parse().unwrap(),
         boundr: vars.get("boundr").unwrap().trim().parse().unwrap(),
     };
-
-    // println!("{}\n", variables.solution);
-    // println!("{}\n", variables.testcase);
-    // println!("{}\n", variables.analk);
-    // println!("{}\n", variables.mattypes);
-    // println!("{}\n", variables.energygroups);
-    // println!("{}\n", variables.generations);
-    // println!("{}\n", variables.histories);
-    // println!("{}\n", variables.skip);
-    // println!("{}\n", variables.numass);
-    // println!("{}\n", variables.numrods);
-    // println!("{}\n", variables.roddia);
-    // println!("{}\n", variables.rodpitch);
-    // println!("{}\n", variables.mpfr);
-    // println!("{}\n", variables.mpwr);
-    // println!("{}\n", variables.boundl);
-    // println!("{}\n", variables.boundr);
     
+    (variables,xsdata,matid)
+}
 
-    variables
+fn get_data(vector: Vec<String>) -> (Vec<u8>, XSData) {
+    let (var_names, var_values): (Vec<&str>, Vec<&str>) =
+        vector.iter().map(|x| x.split_once("=").unwrap()).unzip();
+
+    let mat_pos = var_names
+        .iter()
+        .enumerate()
+        .filter_map(|(index, &ref x)| (x.trim() == "matid").then(|| index))
+        .collect::<Vec<usize>>();
+
+    let mut temp: Vec<Vec<u8>> = vec![];
+    for index in 0..mat_pos.len() {
+        temp.push(
+            var_values[mat_pos[index]]
+                .split_whitespace()
+                .map(|y| y.to_owned().parse::<u8>().unwrap())
+                .collect::<Vec<u8>>(),
+        )
+    }
+
+    // index vector via mat# = matid[config#*numass*((2*numrods)+1)]
+    let matid: Vec<u8> = temp.into_iter().flatten().collect::<Vec<u8>>();
+
+    let variable_names: [&str; 7] = [
+        "sigtr",
+        "sigis",
+        "sigds",
+        "siga",
+        "sigf",
+        "nut",
+        "chit",
+    ];
+
+    let mut positions: Vec<usize> = vec![];
+
+    for index in 0..variable_names.len() {
+        positions.push(
+            var_names
+                .iter()
+                .position(|x| x.trim() == variable_names[index])
+                .unwrap(),
+        );
+    }
+
+    // index into vectors via desired_xs = sigtr[(mat# + mattypes*energygroup) as usize]
+    let xsdata = XSData {
+        sigtr: var_values[positions[0]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+        sigis: var_values[positions[1]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+        sigds: var_values[positions[2]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+        siga: var_values[positions[3]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+        sigf: var_values[positions[4]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+        nut: var_values[positions[5]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+        chit: var_values[positions[6]]
+            .split_whitespace()
+            .map(|x| x.to_owned().parse::<f64>().unwrap())
+            .collect::<Vec<f64>>(),
+    };
+
+
+    (matid, xsdata)
 }
 
 fn main() {
     let now = SystemTime::now();
     for zyn in 0..1000000 {
-        let variables = process_input();
+        let (variables, xsdata, matid) = process_input();
         print!("{}\n", zyn);
     }
-
+    
     print!("{}", now.elapsed().unwrap().as_secs());
-    //let file_path = "../SampleInputFile.txt";
-
-    //println!("In file {}", file_path);
 }
