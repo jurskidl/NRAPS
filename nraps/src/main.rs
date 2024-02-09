@@ -12,7 +12,6 @@ pub enum Solver {
 
 struct Variables {
     solution: u8,
-    testcase: u8,
     analk: u8,
     mattypes: u8,
     energygroups: u8,
@@ -51,9 +50,9 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
 
     let (vector, hash): (Vec<String>, Vec<String>) = lines
         .into_iter()
-        .partition(|x| x.contains("matid") || x.contains("sigtr") || x.contains("sigis") || x.contains("sigds") || x.contains("siga") || x.contains("sigf") || x.contains("nut") || x.contains("chit"));
+        .partition(|x| x.contains("matid"));
 
-    let (matid, xsdata) = get_data(vector);
+    let matid = get_mats(vector);
 
     let vars = hash.into_iter().map(|a| {
         let (key, value) = a.split_once("=").unwrap();
@@ -62,7 +61,6 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
 
     let variables = Variables {
         solution: vars.get("solution").unwrap().trim().parse().unwrap(),
-        testcase: vars.get("testcase").unwrap().trim().parse().unwrap(),
         analk: vars.get("analk").unwrap().trim().parse().unwrap(),
         mattypes: vars.get("mattypes").unwrap().trim().parse().unwrap(),
         energygroups: vars.get("energygroups").unwrap().trim().parse().unwrap(),
@@ -84,11 +82,21 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
         boundl: vars.get("boundl").unwrap().trim().parse().unwrap(),
         boundr: vars.get("boundr").unwrap().trim().parse().unwrap(),
     };
+
+    let xsdata = XSData {
+        sigtr: vars.get("sigtr").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        sigis: vars.get("sigis").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        sigds: vars.get("sigds").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        siga: vars.get("siga").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        sigf: vars.get("sigf").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        nut: vars.get("nut").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        chit: vars.get("chit").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+    };
     
     (variables,xsdata,matid)
 }
 
-fn get_data(vector: Vec<String>) -> (Vec<u8>, XSData) {
+fn get_mats(vector: Vec<String>) -> Vec<u8> {
     let (var_names, var_values): (Vec<&str>, Vec<&str>) =
         vector.iter().map(|x| x.split_once("=").unwrap()).unzip();
 
@@ -108,64 +116,10 @@ fn get_data(vector: Vec<String>) -> (Vec<u8>, XSData) {
         )
     }
 
-    // index vector via mat# = matid[config#*numass*((2*numrods)+1)]
+    // index vector via mat# = matid[numass*((2*numrods)+1)]
     let matid: Vec<u8> = temp.into_iter().flatten().collect::<Vec<u8>>();
 
-    let variable_names: [&str; 7] = [
-        "sigtr",
-        "sigis",
-        "sigds",
-        "siga",
-        "sigf",
-        "nut",
-        "chit",
-    ];
-
-    let mut positions: Vec<usize> = vec![];
-
-    for index in 0..variable_names.len() {
-        positions.push(
-            var_names
-                .iter()
-                .position(|x| x.trim() == variable_names[index])
-                .unwrap(),
-        );
-    }
-
-    // index into vectors via desired_xs = sigtr[(mat# + mattypes*energygroup) as usize]
-    let xsdata = XSData {
-        sigtr: var_values[positions[0]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-        sigis: var_values[positions[1]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-        sigds: var_values[positions[2]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-        siga: var_values[positions[3]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-        sigf: var_values[positions[4]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-        nut: var_values[positions[5]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-        chit: var_values[positions[6]]
-            .split_whitespace()
-            .map(|x| x.to_owned().parse::<f64>().unwrap())
-            .collect::<Vec<f64>>(),
-    };
-
-
-    (matid, xsdata)
+    matid
 }
 
 fn main() {

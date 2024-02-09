@@ -10,23 +10,13 @@
 # Solution = method for solving the problem.                                            #
 #        0 = Finite difference solution method. (Default)                               #
 #        1 = Monte Carlo solution method.                                               #
-# TestCase = The specific cross section data set to be used for this calculation.       #
-# Config   = The specific geometric configuration that will be used for this            #
-#            calculation.                                                               #
 # Analk    = Calculate the analytic multiplication factor.                              #
 Solution = 1
-TestCase = 0
-Config   = 0
 Analk = 1
 
-# Cases    = Number of different sets of cross section data that will be entered in the #
-#            input file.                                                                #
-# Configs  = The total number of different configurations entered into the input file.  #
 # MatTypes = The total number of different material types for cross section data to be  #
 #            entered.                                                                   #
 # EnergyGroups = The total number of different energy groups in the problem.            #
-Cases    = 3
-Configs  = 2
 MatTypes = 4
 EnergyGroups = 2
 
@@ -74,7 +64,6 @@ BoundR = 1.0
 
 XSData
     #           Test Case A cross section data                                          #
-    case = 0
     #             Energy Group 1                        Energy Group 2                  #
     #        UO2      MOX      H2O      CR         UO2      MOX      H2O      CR        #
     #         0        1        2        3          0        1        2        3        #
@@ -86,43 +75,12 @@ XSData
     nuT   = 2.46950  2.84100  0.00000  0.00000    2.46950  2.84100  0.00000  0.00000
     ChiT  = 1.00000  1.00000  0.00000  0.00000    0.00000  0.00000  0.00000  0.00000
 
-    #           Test Case B cross section data                                          #
-    case = 1
-    #         Energy Group 1               Energy Group 2                               #
-    #       UO2    MOX    H2O   CR       UO2   MOX  H2O  CR                             #
-    #        0      1      2     3        0     1    2    3                             #
-    SigTR = 0.2    0.2    0.2   0.1      1.0   1.2  1.1  1.1
-    SigIS = 0.185  0.185  0.17  0.0      0.8   0.8  1.1  0.1
-    SigDS = 0.015  0.015  0.03  0.0      0.0   0.0  0.0  0.0
-    SigA  = 0.0    0.0    0.0   0.1      0.2   0.4  0.0  1.0
-    SigF  = 0.0    0.0    0.0   0.0      0.18  0.3  0.0  0.0
-    nuT   = 0.0    0.0    0.0   0.0      1.4   1.5  0.0  0.0
-    ChiT  = 1.0    1.0    0.0   0.0      0.0   0.0  0.0  0.0
-
-    #           Test Case C cross section data                                          #
-    case = 2
-    #         Energy Group 1               Energy Group 2                               #
-    #       UO2    MOX    H2O   CR       UO2   MOX  H2O  CR                             #
-    #        0      1      2     3        0     1    2    3                             #
-    SigTR = 0.2    0.2    0.2   0.1      0.2   0.6  1.1  1.1
-    SigIS = 0.2    0.2    0.17  0.0      0.0   0.0  1.1  0.1
-    SigDS = 0.0    0.0    0.03  0.0      0.0   0.0  0.0  0.0
-    SigA  = 0.0    0.0    0.0   0.1      0.2   0.6  0.0  1.0
-    SigF  = 0.0    0.0    0.0   0.0      0.2   0.5  0.0  0.0
-    nuT   = 0.0    0.0    0.0   0.0      1.4   1.5  0.0  0.0
-    ChiT  = 1.0    1.0    0.0   0.0      0.0   0.0  0.0  0.0
-END
-
 # Next add the different configurations.                                                #
 ConfigSets
     # .... Define the material composition for each configuration. The set number       #
     #      start with 0.  Material id corresponds with the material location above.     #
     #      NOTE: this should be changed to allow for assembly wise input.               #
     #      UO2 = 0, MOX = 1, H2O = 2, CR = 3                                            #
-    Set = 0
     MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
-    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
-    Set = 1
-    MatID = 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2 1 2
     MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
 END
