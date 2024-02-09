@@ -1,7 +1,10 @@
-use std::time::SystemTime;
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::collections::HashMap;
+// Use these for timing
+use std::thread::sleep;
+use core::time::Duration;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub enum Solver {
     LinAlg,
@@ -123,11 +126,21 @@ fn get_mats(vector: Vec<String>) -> Vec<u8> {
 }
 
 fn main() {
+    // let (variables, xsdata, matid) = process_input();
+
+
+    // below is for timing
     let now = SystemTime::now();
+    let since_the_epoch = now
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+
     for zyn in 0..1000000 {
         let (variables, xsdata, matid) = process_input();
         print!("{}\n", zyn);
     }
-    
-    print!("{}", now.elapsed().unwrap().as_secs());
+
+    print!("{}\n", since_the_epoch.as_millis());
+
+    sleep(Duration::new(30, 0));
 }
