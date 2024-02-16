@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::collections::HashMap;
+use std::iter::repeat;
 // Use these for timing
 // use std::thread::sleep;
 // use core::time::Duration;
@@ -26,8 +27,8 @@ struct Variables {
     numrods: u8,
     roddia: f64,
     rodpitch: f64,
-    mpfr: u8,
-    mpwr: u8,
+    mpfr: usize,
+    mpwr: usize,
     boundl: f64,
     boundr: f64,
 }
@@ -125,8 +126,19 @@ fn get_mats(vector: Vec<String>) -> Vec<u8> {
     matid
 }
 
+fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8>{
+    matid.into_iter().flat_map(|x| {
+        if x == 0 || x == 1 {
+            repeat(x).take(mpfr as usize)   
+        } else {
+            repeat(x).take(mpwr as usize)
+        }
+    }).collect()
+}
 fn main() {
     let (variables, xsdata, matid) = process_input();
+
+    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
 
 
     // below is for timing
