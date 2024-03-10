@@ -4,7 +4,7 @@ use std::collections::HashMap;
 // Use these for timing
 // use std::thread::sleep;
 // use core::time::Duration;
-// use std::time::SystemTime;
+use std::time::SystemTime;
 
 pub enum Solver {
     LinAlg,
@@ -126,18 +126,18 @@ fn get_mats(vector: Vec<String>) -> Vec<u8> {
 }
 
 fn main() {
-    let (variables, xsdata, matid) = process_input();
+    // let (variables, xsdata, matid) = process_input();
 
 
     // below is for timing
-    // let now = SystemTime::now();
+    let now = SystemTime::now();
 
-    // for zyn in 0..1000000 {
-    //     let (variables, xsdata, matid) = process_input();
-    //     print!("{}\n", zyn)
-    // }
+    for zyn in 0..1000000 {
+        let (variables, xsdata, matid) = process_input();
+        print!("{}\n", zyn)
+    }
 
-    // print!("{}\n", now.elapsed().unwrap().as_secs());
+    print!("{}\n", now.elapsed().unwrap().as_millis());
 
     // sleep(Duration::new(30, 0));
 }
