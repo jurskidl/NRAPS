@@ -53,7 +53,7 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     while buffer[pos] != NEWLINE && pos < end {
         pos += 1;
     }
-    pos + 1
+    pos
 }
 
 fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, String> {
@@ -76,23 +76,25 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
                     name_end = pos
                 }
 
-                if buffer[pos] + 1 == SPACE {
+                if buffer[pos + 1] == SPACE {
                     val_start = pos + 1
                 } else {
                     val_start = pos
                 }
             }
             NEWLINE => {
-                if name_end < line_start {
+                if name_end > line_start {
                     let key = String::from_utf8_lossy(&buffer[line_start..name_end])
+                        .trim()
                         .to_string()
                         .to_ascii_lowercase();
-                    let value = String::from_utf8_lossy(&buffer[val_start..pos]).to_string();
+                    let value = String::from_utf8_lossy(&buffer[val_start..pos])
+                        .trim()
+                        .to_string();
                     hash.entry(key)
                         .and_modify(|existing| *existing = existing.to_owned() + " " + &value) // I don't know why this works but the gods have smiled upon me
                         .or_insert(value);
                 } else {
-                    continue;
                 }
                 line_start = pos + 1;
             }
@@ -152,25 +154,6 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     let start = 0;
     let end = mapped_file.len();
     let hash = scan_ascii_chunk(start, end, &&mapped_file);
-
-    // let lines: Vec<String> = mapped_file
-    //     .lines()
-    //     .map(|x| x.expect("Unable to read line").trim().to_ascii_lowercase())
-    //     .filter(|x| !x.starts_with("#") && x.contains("="))
-    //     .collect();
-
-    // let (vector, hash): (Vec<String>, Vec<String>) =
-    //     lines.into_iter().partition(|x| x.contains("matid"));
-
-    // let matid = get_mats(vector);
-
-    // let vars = hash
-    //     .into_iter()
-    //     .map(|a| {
-    //         let (key, value) = a.split_once("=").unwrap();
-    //         (key.trim().to_string(), value.to_string())
-    //     })
-    //     .collect::<HashMap<String, String>>();
 
     let variables = Variables {
         solution: hash.get("solution").unwrap().trim().parse().unwrap(),
@@ -264,7 +247,6 @@ fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
         .collect()
 }
 fn main() {
-    print!("1");
     let (variables, xsdata, matid) = process_input();
 
     let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
