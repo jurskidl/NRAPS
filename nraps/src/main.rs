@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::iter::repeat;
 // Use these for timing
-// use std::thread::sleep;
-// use core::time::Duration;
-// use std::time::SystemTime;
+use std::thread::sleep;
+use core::time::Duration;
+use std::time::SystemTime;
 
 pub const NUM_VARS: usize = 24;
 pub const EQUALS: u8 = 61;
@@ -247,19 +247,19 @@ fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
         .collect()
 }
 fn main() {
-    let (variables, xsdata, matid) = process_input();
+    // let (variables, xsdata, matid) = process_input();
 
-    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    // let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
 
     // below is for timing
-    // let now = SystemTime::now();
+    let now = SystemTime::now();
 
-    // for zyn in 0..1000000 {
-    //     let (variables, xsdata, matid) = process_input();
-    //     print!("{}\n", zyn)
-    // }
+    for zyn in 0..1000000 {
+        let (variables, xsdata, matid) = process_input();
+        print!("{}\n", zyn)
+    }
 
-    // print!("{}\n", now.elapsed().unwrap().as_secs());
+    print!("{}\n", now.elapsed().unwrap().as_millis());
 
     // sleep(Duration::new(30, 0));
 }
