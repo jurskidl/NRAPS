@@ -3,8 +3,6 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::iter::repeat;
 // Use these for timing
-use std::thread::sleep;
-use core::time::Duration;
 use std::time::SystemTime;
 
 pub const NUM_VARS: usize = 24;
@@ -56,13 +54,13 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     pos
 }
 
-fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, String> {
-    let mut hash: HashMap<String, String> = HashMap::new();
+fn scan_ascii_chunk(end: usize, buffer: &[u8]) -> HashMap<String, String> {
+    let mut hash: HashMap<String, String> = HashMap::with_capacity(NUM_VARS);
 
-    let mut pos = start;
-    let mut line_start = start;
-    let mut name_end = start;
-    let mut val_start = start;
+    let mut pos = 0;
+    let mut line_start = 0;
+    let mut name_end = 0;
+    let mut val_start = 0;
     while pos < end {
         match buffer[pos] {
             POUND => {
@@ -108,52 +106,8 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
 fn process_input() -> (Variables, XSData, Vec<u8>) {
     let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
-
-    // If I ever manage to figure out how to merge hashmaps this could be useful
-    // let size = mapped_file.len();
-    // let threads: usize = thread::available_parallelism().unwrap().get();
-    // let chunk_length = size / threads;
-    // let starting_points: Vec<usize> = (0..threads).map(|x| x * chunk_length).collect();
-    // let mut ending_points: Vec<usize> =
-    //     Vec::from_iter(starting_points[1..threads - 1].iter().cloned());
-    // ending_points.push(size);
-
-    // Using a scoped pool to make it easy to share the immutable data from above.
-    // Scan each segment to find station names and values.
-    // std::thread::scope(|scope| {
-    //     let mut handles = HashMap::with_capacity(NUM_VARS);
-    //     for thread in 0..threads {
-    //         let start = starting_points[thread];
-    //         let end = ending_points[thread];
-    //         let buffer = &mapped_file;
-    //         let handle = scope.spawn(move || scan_ascii_chunk(start, end, &buffer));
-    //         handles.push(handle);
-    //     }
-
-    //     // Aggregate the results
-    //     for handle in handles {
-    //         let chunk_result = handle.join().unwrap();
-    //         if result.is_empty() {
-    //             result.extend(chunk_result);
-    //         } else {
-    //             chunk_result.into_iter().for_each(|v| {
-    //                 if let Some(agg) = result.iter_mut().find(|a| a.name == v.name) {
-    //                     agg.sum += v.sum;
-    //                     agg.count += v.count;
-    //                     agg.max = i32::max(agg.max, v.max);
-    //                     agg.min = i32::min(agg.min, v.min);
-    //                 } else {
-    //                     result.push(v);
-    //                 }
-    //             });
-    //         }
-    //     }
-    // });
-
-    // This is only if you can't figure out multithreading
-    let start = 0;
     let end = mapped_file.len();
-    let hash = scan_ascii_chunk(start, end, &&mapped_file);
+    let hash = scan_ascii_chunk(end, &&mapped_file);
 
     let variables = Variables {
         solution: hash.get("solution").unwrap().trim().parse().unwrap(),
@@ -247,19 +201,19 @@ fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
         .collect()
 }
 fn main() {
-    // let (variables, xsdata, matid) = process_input();
+    let (variables, xsdata, matid) = process_input();
 
-    // let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
 
     // below is for timing
-    let now = SystemTime::now();
+    // let now = SystemTime::now();
 
-    for zyn in 0..1000000 {
-        let (variables, xsdata, matid) = process_input();
-        print!("{}\n", zyn)
-    }
+    // for zyn in 0..1000000 {
+    //     let (variables, xsdata, matid) = process_input();
+    //     print!("{}\n", zyn)
+    // }
 
-    print!("{}\n", now.elapsed().unwrap().as_millis());
+    // print!("{}\n", now.elapsed().unwrap().as_millis());
 
     // sleep(Duration::new(30, 0));
 }
