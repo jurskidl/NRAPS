@@ -1,9 +1,7 @@
 use memmap2::MmapOptions;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::iter::repeat;
-use std::thread;
 // Use these for timing
 // use std::thread::sleep;
 // use core::time::Duration;
@@ -20,20 +18,6 @@ pub enum Solver {
     Gaussian,
     Jacobian,
     Sor,
-}
-
-struct Aggregator {
-    name: String,
-    value: String,
-}
-
-impl Default for Aggregator {
-    fn default() -> Self {
-        Self {
-            name: String::new(),
-            value: String::new(),
-        }
-    }
 }
 
 struct Variables {
@@ -265,32 +249,6 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
         .collect();
 
     (variables, xsdata, matid)
-}
-
-fn get_mats(vector: Vec<String>) -> Vec<u8> {
-    let (var_names, var_values): (Vec<&str>, Vec<&str>) =
-        vector.iter().map(|x| x.split_once("=").unwrap()).unzip();
-
-    let mat_pos = var_names
-        .iter()
-        .enumerate()
-        .filter_map(|(index, &ref x)| (x.trim() == "matid").then(|| index))
-        .collect::<Vec<usize>>();
-
-    let mut temp: Vec<Vec<u8>> = vec![];
-    for index in 0..mat_pos.len() {
-        temp.push(
-            var_values[mat_pos[index]]
-                .split_whitespace()
-                .map(|y| y.to_owned().parse::<u8>().unwrap())
-                .collect::<Vec<u8>>(),
-        )
-    }
-
-    // index vector via mat# = matid[numass*((2*numrods)+1)]
-    let matid: Vec<u8> = temp.into_iter().flatten().collect::<Vec<u8>>();
-
-    matid
 }
 
 fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
