@@ -1,9 +1,7 @@
-use std::fs::File;
-use std::io::{BufReader, BufRead};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 // Use these for timing
-// use std::thread::sleep;
-// use core::time::Duration;
 use std::time::SystemTime;
 
 pub enum Solver {
@@ -51,16 +49,18 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
         .filter(|x| !x.starts_with("#") && x.contains("="))
         .collect();
 
-    let (vector, hash): (Vec<String>, Vec<String>) = lines
-        .into_iter()
-        .partition(|x| x.contains("matid"));
+    let (vector, hash): (Vec<String>, Vec<String>) =
+        lines.into_iter().partition(|x| x.contains("matid"));
 
     let matid = get_mats(vector);
 
-    let vars = hash.into_iter().map(|a| {
-        let (key, value) = a.split_once("=").unwrap();
-        (key.trim().to_string(), value.to_string())
-    }).collect::<HashMap<String,String>>();
+    let vars = hash
+        .into_iter()
+        .map(|a| {
+            let (key, value) = a.split_once("=").unwrap();
+            (key.trim().to_string(), value.to_string())
+        })
+        .collect::<HashMap<String, String>>();
 
     let variables = Variables {
         solution: vars.get("solution").unwrap().trim().parse().unwrap(),
@@ -87,16 +87,51 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     };
 
     let xsdata = XSData {
-        sigtr: vars.get("sigtr").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
-        sigis: vars.get("sigis").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
-        sigds: vars.get("sigds").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
-        siga: vars.get("siga").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
-        sigf: vars.get("sigf").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
-        nut: vars.get("nut").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
-        chit: vars.get("chit").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect(),
+        sigtr: vars
+            .get("sigtr")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        sigis: vars
+            .get("sigis")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        sigds: vars
+            .get("sigds")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        siga: vars
+            .get("siga")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        sigf: vars
+            .get("sigf")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        nut: vars
+            .get("nut")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        chit: vars
+            .get("chit")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
     };
-    
-    (variables,xsdata,matid)
+
+    (variables, xsdata, matid)
 }
 
 fn get_mats(vector: Vec<String>) -> Vec<u8> {
@@ -127,7 +162,6 @@ fn get_mats(vector: Vec<String>) -> Vec<u8> {
 
 fn main() {
     // let (variables, xsdata, matid) = process_input();
-
 
     // below is for timing
     let now = SystemTime::now();
