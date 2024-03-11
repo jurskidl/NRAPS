@@ -201,17 +201,21 @@ fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
         .collect()
 }
 fn main() {
-    // let (variables, xsdata, matid) = process_input();
+    let (variables, xsdata, matid) = process_input();
 
-    // let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
 
     // below is for timing
-    let now = SystemTime::now();
+    // let mut now = SystemTime::now();
 
-    for zyn in 0..1000000 {
-        let (variables, xsdata, matid) = process_input();
-        print!("{}\n", zyn)
-    }
-
-    print!("{}\n", now.elapsed().unwrap().as_millis());
+    // for zyn in 0..1000000 {
+    //     if zyn % 10000 == 0 {
+    //         print!(
+    //             "Average time over those 10000 runs was {} microseconds \n",
+    //             now.elapsed().unwrap().as_micros() / 10000
+    //         );
+    //         now = SystemTime::now();
+    //     }
+    //     let (variables, xsdata, matid) = process_input();
+    // }
 }
