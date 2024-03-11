@@ -134,57 +134,55 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     };
 
     let xsdata = XSData {
-        sigtr: hash
+        sigtr: vars
             .get("sigtr")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        sigis: hash
+        sigis: vars
             .get("sigis")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        sigds: hash
+        sigds: vars
             .get("sigds")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        siga: hash
+        siga: vars
             .get("siga")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        sigf: hash
+        sigf: vars
             .get("sigf")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        nut: hash
+        nut: vars
             .get("nut")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        chit: hash
+        chit: vars
             .get("chit")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
     };
-
     let matid: Vec<u8> = hash
         .get("matid")
         .unwrap()
         .split_ascii_whitespace()
         .map(|x| x.parse::<u8>().unwrap())
         .collect();
-
     (variables, xsdata, matid)
 }
 
@@ -201,21 +199,15 @@ fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
         .collect()
 }
 fn main() {
-    let (variables, xsdata, matid) = process_input();
-
-    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    // let (variables, xsdata, matid) = process_input();
 
     // below is for timing
-    // let mut now = SystemTime::now();
+    let now = SystemTime::now();
 
-    // for zyn in 0..1000000 {
-    //     if zyn % 10000 == 0 {
-    //         print!(
-    //             "Average time over those 10000 runs was {} microseconds \n",
-    //             now.elapsed().unwrap().as_micros() / 10000
-    //         );
-    //         now = SystemTime::now();
-    //     }
-    //     let (variables, xsdata, matid) = process_input();
-    // }
+    for zyn in 0..1000000 {
+        let (variables, xsdata, matid) = process_input();
+        print!("{}\n", zyn)
+    }
+
+    print!("{}\n", now.elapsed().unwrap().as_millis());
 }
