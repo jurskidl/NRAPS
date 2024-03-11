@@ -5,7 +5,7 @@ use std::iter::repeat;
 // For Multithreading
 // use std::thread;
 // Use these for timing
-// use std::time::SystemTime;
+use std::time::SystemTime;
 
 pub const NUM_VARS: usize = 24;
 pub const EQUALS: u8 = 61;
@@ -60,7 +60,7 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     while buffer[pos] != NEWLINE && pos < end {
         pos += 1;
     }
-    pos
+    pos + 1
 }
 
 fn scan_ascii_chunk(end: usize, buffer: &[u8]) -> HashMap<String, String> {
@@ -86,17 +86,8 @@ fn scan_ascii_chunk(end: usize, buffer: &[u8]) -> HashMap<String, String> {
                 line_start = pos;
             }
             EQUALS => {
-                if buffer[pos - 1] == SPACE {
-                    name_end = pos - 1
-                } else {
-                    name_end = pos
-                }
-
-                if buffer[pos + 1] == SPACE {
-                    val_start = pos + 1
-                } else {
-                    val_start = pos
-                }
+                name_end = pos - 1;
+                val_start = pos + 1;
             }
             NEWLINE => {
                 if name_end > line_start {
@@ -235,34 +226,34 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     (variables, xsdata, matid)
 }
 
-fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
-    matid
-        .into_iter()
-        .flat_map(|x| {
-            if x == 0 || x == 1 {
-                repeat(x).take(mpfr as usize)
-            } else {
-                repeat(x).take(mpwr as usize)
-            }
-        })
-        .collect()
-}
+// fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
+//     matid
+//         .into_iter()
+//         .flat_map(|x| {
+//             if x == 0 || x == 1 {
+//                 repeat(x).take(mpfr as usize)
+//             } else {
+//                 repeat(x).take(mpwr as usize)
+//             }
+//         })
+//         .collect()
+// }
 fn main() {
-    let (variables, xsdata, matid) = process_input();
+    // let (variables, xsdata, matid) = process_input();
 
-    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    // let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
 
     // below is for timing
-    // let mut now = SystemTime::now();
+    let mut now = SystemTime::now();
 
-    // for zyn in 0..1000000 {
-    //     if zyn % 10000 == 0 {
-    //         print!(
-    //             "Average time over those 10000 runs was {} microseconds \n",
-    //             now.elapsed().unwrap().as_micros() / 10000
-    //         );
-    //         now = SystemTime::now();
-    //     }
-    //     let (variables, xsdata, matid) = process_input();
-    // }
+    for zyn in 0..1000000 {
+        if zyn % 10000 == 0 {
+            print!(
+                "Average time over those 10000 runs was {} microseconds \n",
+                now.elapsed().unwrap().as_micros() / 10000
+            );
+            now = SystemTime::now();
+        }
+        let (variables, xsdata, matid) = process_input();
+    }
 }

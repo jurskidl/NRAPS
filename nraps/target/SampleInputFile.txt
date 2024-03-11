@@ -11,7 +11,7 @@
 #        0 = Finite difference solution method. (Default)                               #
 #        1 = Monte Carlo solution method.                                               #
 # Analk    = Calculate the analytic multiplication factor.                              #
-Solution = 1
+Solution= 1
 Analk = 1
 
 # MatTypes = The total number of different material types for cross section data to be  #
