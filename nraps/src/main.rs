@@ -2,9 +2,9 @@ use memmap2::MmapOptions;
 use std::collections::HashMap;
 use std::fs::File;
 use std::iter::repeat;
-use std::{result, thread};
+use std:: thread;
 // Use these for timing
-use std::time::SystemTime;
+// use std::time::SystemTime;
 
 pub const NUM_VARS: usize = 24;
 pub const EQUALS: u8 = 61;
@@ -154,10 +154,6 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
 
     // let end = mapped_file.len();
     // let hash = scan_ascii_chunk(end, &&mapped_file);
-
-    for (key, value) in &result {
-        println!("{}: {}", key, value);
-    }
 
     let variables = Variables {
         solution: result.get("solution").unwrap().trim().parse().unwrap(),
