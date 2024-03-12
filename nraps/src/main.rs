@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::iter::repeat;
 // For Multithreading
-// use std::thread;
+use std::thread;
 // Use these for timing
 use std::time::SystemTime;
 
@@ -63,22 +63,19 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     pos + 1
 }
 
-fn scan_ascii_chunk(end: usize, buffer: &[u8]) -> HashMap<String, String> {
+fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, String> {
     let mut hash: HashMap<String, String> = HashMap::with_capacity(NUM_VARS);
 
+    let mut pos = start;
+    let mut line_start = start;
+    let mut name_end = start;
+    let mut val_start = start;
+
     // If multithreading
-    // let mut pos = start;
-    // let mut line_start = start;
-    // let mut name_end = start;
-    // let mut val_start = start;
     // if end != buffer.len() && buffer[end] != NEWLINE {
     //     end = next_end_line(end, buffer);
     // }
 
-    let mut pos = 0;
-    let mut line_start = 0;
-    let mut name_end = 0;
-    let mut val_start = 0;
     while pos < end {
         match buffer[pos] {
             POUND => {
@@ -115,11 +112,12 @@ fn scan_ascii_chunk(end: usize, buffer: &[u8]) -> HashMap<String, String> {
 fn process_input() -> (Variables, XSData, Vec<u8>) {
     let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
-    let end = mapped_file.len();
-    let hash = scan_ascii_chunk(end, &&mapped_file);
+    let start: usize = 0;
+    let end: usize = mapped_file.len();
+    let hash: HashMap<String, String> = scan_ascii_chunk(start, end, &&mapped_file);
 
     // For Multithreading
-    // let size = mapped_file.len();
+    // let size: usize = mapped_file.len();
     // let threads: usize = thread::available_parallelism().unwrap().get();
     // let chunk_length = size / threads;
     // let starting_points: Vec<usize> = (0..threads).map(|x| x * chunk_length).collect();
@@ -141,8 +139,7 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     //     for handle in handles {
     //         let chunk_result = handle.join().unwrap();
     //         for (key, value) in chunk_result {
-    //             hash
-    //                 .entry(key.trim().to_string())
+    //             hash.entry(key.trim().to_string())
     //                 .and_modify(|existing| *existing = existing.to_owned() + " " + &value)
     //                 .or_insert(value);
     //         }
