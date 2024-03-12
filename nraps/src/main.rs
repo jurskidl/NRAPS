@@ -22,7 +22,6 @@ pub enum Solver {
 }
 
 struct Variables {
-    solution: u8,
     analk: u8,
     mattypes: u8,
     energygroups: u8,
@@ -35,11 +34,14 @@ struct Variables {
     roddia: f64,
     rodpitch: f64,
     mpfr: usize,
-    frmesh_dx: f64,
     mpwr: usize,
-    wrmesh_dx: f64,
     boundl: f64,
     boundr: f64,
+}
+
+struct DeltaX {
+    fuel: f64,
+    water: f64,
 }
 
 struct XSData {
@@ -51,6 +53,16 @@ struct XSData {
     nut: Vec<f64>,
     chit: Vec<f64>,
 }
+
+struct Mesh {
+    matid: u8,
+    delta_x: f64,
+    mesh_left: f64,
+    mesh_right: f64,
+    mat_left: f64,
+    mat_right: f64,
+}
+
 // If multithreading
 // fn next_end_line(mut end: usize, buffer: &[u8]) -> usize {
 //     while buffer[end] != NEWLINE && end < buffer.len() {
@@ -112,7 +124,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
     hash
 }
 
-fn process_input() -> (Variables, XSData, Vec<u8>) {
+fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
     let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
@@ -150,7 +162,6 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     // });
 
     let variables = Variables {
-        solution: hash.get("solution").unwrap().trim().parse().unwrap(),
         analk: hash.get("analk").unwrap().trim().parse().unwrap(),
         mattypes: hash.get("mattypes").unwrap().trim().parse().unwrap(),
         energygroups: hash.get("energygroups").unwrap().trim().parse().unwrap(),
@@ -168,13 +179,14 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
         roddia: hash.get("roddia").unwrap().trim().parse().unwrap(),
         rodpitch: hash.get("rodpitch").unwrap().trim().parse().unwrap(),
         mpfr: hash.get("mpfr").unwrap().trim().parse().unwrap(),
-        frmesh_dx: hash.get("roddia").unwrap().trim().parse::<f64>().unwrap()
-            / hash.get("mpfr").unwrap().trim().parse::<f64>().unwrap(),
         mpwr: hash.get("mpwr").unwrap().trim().parse().unwrap(),
-        wrmesh_dx: hash.get("rodpitch").unwrap().trim().parse::<f64>().unwrap()
-            / hash.get("mpwr").unwrap().trim().parse::<f64>().unwrap(),
         boundl: hash.get("boundl").unwrap().trim().parse().unwrap(),
         boundr: hash.get("boundr").unwrap().trim().parse().unwrap(),
+    };
+
+    let deltax = DeltaX {
+        fuel: variables.roddia / variables.mpfr as f64,
+        water: variables.rodpitch / variables.mpwr as f64,
     };
 
     // index into vectors via desired_xs = sigtr[(mat# + ((energygroup-1)*mattypes) as usize]
@@ -230,93 +242,315 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
         .split_ascii_whitespace()
         .map(|x| x.parse::<u8>().unwrap())
         .collect();
-    (variables, xsdata, matid)
+    (
+        variables,
+        xsdata,
+        matid,
+        deltax,
+        hash.get("solution").unwrap().trim().parse().unwrap(),
+    )
 }
 
-fn geometry_calc(
-    roddia: f64,
-    mpfr: usize,
-    rodpitch: f64,
-    mpwr: usize,
-    matid: &Vec<u8>,
-) -> (f64, f64, f64) {
-    let frmesh_dx: f64 = roddia / mpfr as f64;
-    let wrmesh_dx: f64 = rodpitch / mpwr as f64;
-    let ass_len: f64 = matid.clone().into_iter().filter(|x| x <= &1).count() as f64 * roddia
-        + (matid.into_iter().filter(|x| x > &&1).count() - 1) as f64 * rodpitch;
-
-    println!("{}", ass_len);
-
-    (frmesh_dx, wrmesh_dx, ass_len)
-}
-
-fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
+fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh> {
     let mut temp: Vec<u8> = matid
         .into_iter()
         .flat_map(|x| {
             if x == 0 || x == 1 {
-                repeat(x).take(mpfr as usize)
+                repeat(x).take(variables.mpfr as usize)
             } else {
-                repeat(x).take(mpwr as usize)
+                repeat(x).take(variables.mpwr as usize)
             }
         })
         .collect();
 
+    // We want to remove the extra water meshes from the center of the array
+    // take advantage of code bitshifting instead of dividing in this case by dividing an int by 2
+    for _index in 0..variables.mpwr {
+        temp.remove(temp.len() / 2);
+    }
+
+    // More generic version
+    // for index1 in 0..numass - 1 {
+    //     for index2 in 0..mpwr {
+    //         temp.remove((index1 * temp.len()) / numass);
+    //     }
+    // }
+
     // MPWR/2 will be rounded down in the case of an odd int
-    temp.drain(0..(mpwr / 2));
-    temp.truncate(temp.len() - (mpwr / 2));
-    temp
+    temp.drain(0..(variables.mpwr / 2));
+    temp.truncate(temp.len() - (variables.mpwr / 2));
+
+    let mut mesh: Vec<Mesh> = Vec::with_capacity(temp.len());
+
+    let mut mesh_left: f64 = 0.0;
+    let mut mat_left: f64 = 0.0;
+    let mut mat_right: f64 = variables.rodpitch * 0.5;
+    let mut last_item = temp[0];
+    for item in temp {
+        if (item == 0 || item == 1) && item != last_item {
+            mat_left = mesh_left;
+            mat_right = mat_left + variables.mpfr as f64 * deltax.fuel;
+            for _x in 0..variables.mpfr {
+                let temp = Mesh {
+                    matid: item,
+                    delta_x: deltax.fuel,
+                    mesh_left: mesh_left,
+                    mesh_right: mesh_left + deltax.fuel,
+                    mat_left: mat_left,
+                    mat_right: mat_right,
+                };
+                mesh.push(temp);
+                mesh_left += deltax.fuel;
+                last_item = item
+            }
+        } else if (item == 0 || item == 1) && item == last_item {
+            for _x in 0..variables.mpfr {
+                let temp = Mesh {
+                    matid: item,
+                    delta_x: deltax.fuel,
+                    mesh_left: mesh_left,
+                    mesh_right: mesh_left + deltax.fuel,
+                    mat_left: mat_left,
+                    mat_right: mat_right,
+                };
+                mesh.push(temp);
+                mesh_left += deltax.fuel;
+            }
+        } else if item != last_item {
+            mat_left = mesh_left;
+            mat_right = mat_left + variables.mpwr as f64 * deltax.water;
+            for _x in 0..variables.mpwr {
+                let temp = Mesh {
+                    matid: item,
+                    delta_x: deltax.water,
+                    mesh_left: mesh_left,
+                    mesh_right: mesh_left + deltax.water,
+                    mat_left: mat_left,
+                    mat_right: mat_right,
+                };
+                mesh.push(temp);
+                mesh_left += deltax.water;
+                last_item = item
+            }
+        } else {
+            for _x in 0..variables.mpwr {
+                let temp = Mesh {
+                    matid: item,
+                    delta_x: deltax.water,
+                    mesh_left: mesh_left,
+                    mesh_right: mesh_left + deltax.water,
+                    mat_left: mat_left,
+                    mat_right: mat_right,
+                };
+                mesh.push(temp);
+                mesh_left += deltax.water;
+            }
+        }
+    }
+
+    mesh
 }
 
-fn spawn_neutron(numass: u8, energy_groups: u8) -> (usize, f64, u8) {
-    let spawn_string: String = thread_rng().gen_range(1.0..(numass + 1) as f64).to_string();
+fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, u8) {
+    let spawn_string: String = thread_rng()
+        .gen_range(1.0..(variables.numass * variables.numrods) as f64)
+        .to_string();
     let (temp_int, temp_dec) = spawn_string.split_once(".").unzip();
+    let temp2 = (("0.".to_string() + temp_dec.unwrap())
+        .parse::<f64>()
+        .unwrap()
+        / delta_x.fuel)
+        .to_string();
+    let (temp2_int, temp2_dec) = temp2.split_once(".").unzip();
     let temp_energy: f64 = thread_rng().gen();
     let chi = if temp_energy >= 0.7 { 1 } else { 2 };
-    match energy_groups {
+    match variables.energygroups {
         4 => {
             return (
-                temp_int.unwrap().parse::<usize>().unwrap(),
-                temp_dec.unwrap().parse::<f64>().unwrap(),
+                ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
+                    + variables.mpwr / 2
+                    + temp2_int.unwrap().parse::<usize>().unwrap(),
+                ("0.".to_string() + temp2_dec.unwrap())
+                    .parse::<f64>()
+                    .unwrap(),
                 chi,
             )
         }
         _ => {
             return (
-                temp_int.unwrap().parse::<usize>().unwrap(),
-                temp_dec.unwrap().parse::<f64>().unwrap(),
-                1,
+                ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
+                    + variables.mpwr / 2
+                    + temp2_int.unwrap().parse::<usize>().unwrap(),
+                ("0.".to_string() + temp2_dec.unwrap())
+                    .parse::<f64>()
+                    .unwrap(),
+                chi,
             )
         }
     }
 }
 
-fn mcnp(variables: Variables, xsdata: XSData, meshid: Vec<u8>) {
+fn monte_carlo(variables: &Variables, xsdata: &XSData, delta_x: &DeltaX, meshid: &Vec<Mesh>) {
+    println!("ruunning monte carlo code");
     for x in 0..variables.generations {
-        for y in 0..variables.histories {
-            let (spawn_ass, spawn_loc, chi) =
-                spawn_neutron(variables.numass, variables.energygroups);
-            let mu: f64 = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
-            let particle_exists = true;
+        println!("Starting Generation {x}");
+        let mut next_gen: f64 = 0.0;
+        for _y in 0..variables.histories {
+            // spawn_sub_mesh is the partial distance through the mesh
+            let (mut mesh_index, spawn_sub_mesh, mut chi): (usize, f64, u8) =
+                spawn_neutron(&variables, &delta_x);
+            let mut mu: f64 = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
+            let mut particle_exists: bool = true;
 
             while particle_exists == true {
-                let travel = thread_rng().gen::<f64>().ln()
-                    / xsdata.sigtr[(meshid[spawn_ass as f64 + spawn_loc]
-                        + variables.mattypes * (chi - 1))
-                        as usize];
+                let s: f64 = thread_rng().gen::<f64>().ln()
+                    / xsdata.sigtr
+                        [(meshid[mesh_index].matid + variables.mattypes * (chi - 1)) as usize];
+                let mut delta_s: f64 = mu * s;
+
+                let mut same_material: bool = true;
+                let mut start_x: f64 = meshid[mesh_index].mesh_left + spawn_sub_mesh;
+
+                let end_x = start_x + delta_s;
+                while same_material == true {
+                    if (mu < 0.0 && mesh_index == 0 && end_x < meshid[mesh_index].mesh_left)
+                        || (mu >= 0.0
+                            && mesh_index == meshid.len() - 1
+                            && end_x > meshid[mesh_index].mesh_right)
+                    {
+                        // println!("Hitting the boundary");
+                        if mu < 0.0 {
+                            // tally_length[mesh_index] +=
+                            //     (meshid[mesh_index].mesh_left - start_x).abs() / mu;
+                            mu *= -variables.boundl;
+                            delta_s *= -variables.boundl;
+                            start_x = meshid[mesh_index].mesh_left;
+                        } else {
+                            // tally_length[mesh_index] +=
+                            //     (meshid[mesh_index].mesh_right - start_x) / mu;
+                            mu *= -variables.boundr;
+                            delta_s *= -variables.boundr;
+                            start_x = meshid[mesh_index].mesh_right;
+                        }
+                    } else if mu < 0.0 && end_x < meshid[mesh_index].mat_left {
+                        // println!("exiting mat left");
+                        // tally_length[mesh_index] +=
+                        //     (meshid[mesh_index].mesh_left - start_x) / mu;
+                        mesh_index -= 1;
+                        while meshid[mesh_index].matid != meshid[mesh_index - 1].matid {
+                            // tally_length[mesh_index] +=
+                            //     (meshid[mesh_index].mesh_left - meshid[meshindex].mesh_right) / mu;
+                            if mesh_index == 1 {
+                                break;
+                            }
+                            mesh_index -= 1;
+                        }
+                        same_material = false;
+                    } else if mu < 0.0 && end_x < meshid[mesh_index].mesh_left {
+                        // println!("exiting mesh left");
+                        // tally_length[mesh_index] +=
+                        //     (meshid[mesh_index].mesh_left - start_x) / mu;
+                        delta_s -= start_x - meshid[mesh_index].mesh_left;
+                        start_x = meshid[mesh_index].mesh_left;
+                        mesh_index -= 1;
+                    } else if mu < 0.0 {
+                        // println!("interacting left");
+                        // tally_length[mesh_index] +=
+                        //     (meshid[mesh_index].mesh_left - start_x) / mu
+                        let xs_index: usize =
+                            (meshid[mesh_index].matid + variables.mattypes * (chi - 1)) as usize;
+                        let interaction = thread_rng().gen_range(0.0..xsdata.sigtr[xs_index]);
+                        if interaction <= xsdata.sigis[xs_index] {
+                            // println!("in scatter");
+                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
+                        } else if interaction <= xsdata.sigis[xs_index] + xsdata.sigds[xs_index] {
+                            // println!("down scatter");
+                            chi += 1;
+                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
+                        } else if interaction
+                            <= xsdata.sigis[xs_index]
+                                + xsdata.sigds[xs_index]
+                                + xsdata.siga[xs_index]
+                        {
+                            // println!("absorption");
+                            particle_exists = false;
+                            same_material = false;
+                        } else {
+                            // println!("fission");
+                            next_gen += xsdata.nut[xs_index];
+                            particle_exists = false;
+                            same_material = false;
+                        }
+                    } else if mu >= 0.0 && end_x > meshid[mesh_index].mat_right {
+                        // println!(" exiting mat right");
+                        // tally_length[mesh_index] +=
+                        //     (meshid[mesh_index].mesh_right - start_x) / mu;
+                        mesh_index += 1;
+                        while meshid[mesh_index - 1].matid == meshid[mesh_index].matid
+                            && mesh_index < (meshid.len() - 1)
+                        {
+                            // tally_length[mesh_index] +=
+                            //     (meshid[mesh_index].mesh_right - meshid[meshindex].mesh_left) / mu;
+                            mesh_index += 1;
+                        }
+
+                        if mesh_index != meshid.len() - 1 {
+                            same_material = false
+                        }
+                    } else if mu >= 0.0 && end_x > meshid[mesh_index].mesh_right {
+                        // println!("exiting mesh right");
+                        // tally_length[mesh_index] +=
+                        //     (meshid[mesh_index].mesh_right - start_x) / mu;
+                        delta_s += meshid[mesh_index].mesh_right - start_x;
+                        start_x = meshid[mesh_index].mesh_right;
+                        mesh_index += 1;
+                    } else {
+                        // println!("interacting right");
+                        // tally_length[mesh_index] +=
+                        //     (meshid[mesh_index].mesh_right - start_x) / mu;
+                        let xs_index: usize =
+                            (meshid[mesh_index].matid + variables.mattypes * (chi - 1)) as usize;
+                        let interaction = thread_rng().gen_range(0.0..xsdata.sigtr[xs_index]);
+                        if interaction <= xsdata.sigis[xs_index] {
+                            // println!("in scatter");
+                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
+                        } else if interaction <= xsdata.sigis[xs_index] + xsdata.sigds[xs_index] {
+                            // println!("down scatter");
+                            chi += 1;
+                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
+                        } else if interaction
+                            <= xsdata.sigis[xs_index]
+                                + xsdata.sigds[xs_index]
+                                + xsdata.siga[xs_index]
+                        {
+                            // println!("absorption");
+                            particle_exists = false;
+                            same_material = false;
+                        } else {
+                            // println!("fission!");
+                            next_gen += xsdata.nut[xs_index];
+                            particle_exists = false;
+                            same_material = false;
+                        }
+                    }
+                }
             }
         }
+
+        println!("keff would be {}", next_gen / variables.histories as f64);
     }
 }
 fn main() {
-    let (variables, xsdata, matid) = process_input();
+    let (variables, xsdata, matid, deltax, solution) = process_input();
 
-    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    // index meshid via [assembly# * rod#]
+    let meshid = mesh_gen(matid, &variables, &deltax);
 
-    match variables.solution {
-        1 => mcnp(variables, xsdata, meshid),
+    match solution {
+        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid),
         _ => {} // not implemented
     }
+
     // below is for timing
     // let mut now = SystemTime::now();
 
