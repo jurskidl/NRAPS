@@ -1,11 +1,12 @@
 use memmap2::MmapOptions;
+use rand::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::iter::repeat;
 // For Multithreading
-use std::thread;
+// use std::thread;
 // Use these for timing
-use std::time::SystemTime;
+// use std::time::SystemTime;
 
 pub const NUM_VARS: usize = 24;
 pub const EQUALS: u8 = 61;
@@ -26,15 +27,17 @@ struct Variables {
     mattypes: u8,
     energygroups: u8,
     solver: Solver,
-    generations: u32,
-    histories: u32,
+    generations: usize,
+    histories: usize,
     skip: u16,
     numass: u8,
     numrods: u8,
     roddia: f64,
     rodpitch: f64,
     mpfr: usize,
+    frmesh_dx: f64,
     mpwr: usize,
+    wrmesh_dx: f64,
     boundl: f64,
     boundr: f64,
 }
@@ -165,11 +168,16 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
         roddia: hash.get("roddia").unwrap().trim().parse().unwrap(),
         rodpitch: hash.get("rodpitch").unwrap().trim().parse().unwrap(),
         mpfr: hash.get("mpfr").unwrap().trim().parse().unwrap(),
+        frmesh_dx: hash.get("roddia").unwrap().trim().parse::<f64>().unwrap()
+            / hash.get("mpfr").unwrap().trim().parse::<f64>().unwrap(),
         mpwr: hash.get("mpwr").unwrap().trim().parse().unwrap(),
+        wrmesh_dx: hash.get("rodpitch").unwrap().trim().parse::<f64>().unwrap()
+            / hash.get("mpwr").unwrap().trim().parse::<f64>().unwrap(),
         boundl: hash.get("boundl").unwrap().trim().parse().unwrap(),
         boundr: hash.get("boundr").unwrap().trim().parse().unwrap(),
     };
 
+    // index into vectors via desired_xs = sigtr[(mat# + ((energygroup-1)*mattypes) as usize]
     let xsdata = XSData {
         sigtr: hash
             .get("sigtr")
@@ -214,6 +222,8 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
             .map(|x| x.parse().unwrap())
             .collect(),
     };
+
+    // index vector via mat# = matid[config#*numass*((2*numrods)+1)]
     let matid: Vec<u8> = hash
         .get("matid")
         .unwrap()
@@ -223,34 +233,102 @@ fn process_input() -> (Variables, XSData, Vec<u8>) {
     (variables, xsdata, matid)
 }
 
-// fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
-//     matid
-//         .into_iter()
-//         .flat_map(|x| {
-//             if x == 0 || x == 1 {
-//                 repeat(x).take(mpfr as usize)
-//             } else {
-//                 repeat(x).take(mpwr as usize)
-//             }
-//         })
-//         .collect()
-// }
-fn main() {
-    // let (variables, xsdata, matid) = process_input();
+fn geometry_calc(
+    roddia: f64,
+    mpfr: usize,
+    rodpitch: f64,
+    mpwr: usize,
+    matid: &Vec<u8>,
+) -> (f64, f64, f64) {
+    let frmesh_dx: f64 = roddia / mpfr as f64;
+    let wrmesh_dx: f64 = rodpitch / mpwr as f64;
+    let ass_len: f64 = matid.clone().into_iter().filter(|x| x <= &1).count() as f64 * roddia
+        + (matid.into_iter().filter(|x| x > &&1).count() - 1) as f64 * rodpitch;
 
-    // let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    println!("{}", ass_len);
 
-    // below is for timing
-    let mut now = SystemTime::now();
+    (frmesh_dx, wrmesh_dx, ass_len)
+}
 
-    for zyn in 0..1000000 {
-        if zyn % 10000 == 0 {
-            print!(
-                "Average time over those 10000 runs was {} microseconds \n",
-                now.elapsed().unwrap().as_micros() / 10000
-            );
-            now = SystemTime::now();
+fn mesh_gen(matid: Vec<u8>, mpfr: usize, mpwr: usize) -> Vec<u8> {
+    let mut temp: Vec<u8> = matid
+        .into_iter()
+        .flat_map(|x| {
+            if x == 0 || x == 1 {
+                repeat(x).take(mpfr as usize)
+            } else {
+                repeat(x).take(mpwr as usize)
+            }
+        })
+        .collect();
+
+    // MPWR/2 will be rounded down in the case of an odd int
+    temp.drain(0..(mpwr / 2));
+    temp.truncate(temp.len() - (mpwr / 2));
+    temp
+}
+
+fn spawn_neutron(numass: u8, energy_groups: u8) -> (usize, f64, u8) {
+    let spawn_string: String = thread_rng().gen_range(1.0..(numass + 1) as f64).to_string();
+    let (temp_int, temp_dec) = spawn_string.split_once(".").unzip();
+    let temp_energy: f64 = thread_rng().gen();
+    let chi = if temp_energy >= 0.7 { 1 } else { 2 };
+    match energy_groups {
+        4 => {
+            return (
+                temp_int.unwrap().parse::<usize>().unwrap(),
+                temp_dec.unwrap().parse::<f64>().unwrap(),
+                chi,
+            )
         }
-        let (variables, xsdata, matid) = process_input();
+        _ => {
+            return (
+                temp_int.unwrap().parse::<usize>().unwrap(),
+                temp_dec.unwrap().parse::<f64>().unwrap(),
+                1,
+            )
+        }
     }
+}
+
+fn mcnp(variables: Variables, xsdata: XSData, meshid: Vec<u8>) {
+    for x in 0..variables.generations {
+        for y in 0..variables.histories {
+            let (spawn_ass, spawn_loc, chi) =
+                spawn_neutron(variables.numass, variables.energygroups);
+            let mu: f64 = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
+            let particle_exists = true;
+
+            while particle_exists == true {
+                let travel = thread_rng().gen::<f64>().ln()
+                    / xsdata.sigtr[(meshid[spawn_ass as f64 + spawn_loc]
+                        + variables.mattypes * (chi - 1))
+                        as usize];
+            }
+        }
+    }
+}
+fn main() {
+    let (variables, xsdata, matid) = process_input();
+
+    let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+
+    match variables.solution {
+        1 => mcnp(variables, xsdata, meshid),
+        _ => {} // not implemented
+    }
+    // below is for timing
+    // let mut now = SystemTime::now();
+
+    // for zyn in 0..1000000 {
+    //     if zyn % 10000 == 0 {
+    //         print!(
+    //             "Average time over those 10000 runs was {} microseconds \n",
+    //             now.elapsed().unwrap().as_micros() / 10000
+    //         );
+    //         now = SystemTime::now();
+    //     }
+    //     let (variables, xsdata, matid) = process_input();
+    //     let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
+    // }
 }
