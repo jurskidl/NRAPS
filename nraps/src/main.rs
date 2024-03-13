@@ -1,4 +1,5 @@
 use memmap2::MmapOptions;
+use plotpy::{Curve, Plot, StrError};
 use rand::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
@@ -59,13 +60,18 @@ struct Mesh {
     delta_x: f64,
     mesh_left: f64,
     mesh_right: f64,
-    mat_left: f64,
-    mat_right: f64,
 }
 
 struct Tally {
     tally_length0: Vec<f64>,
     tally_length1: Vec<f64>,
+}
+
+struct SoltuionResults {
+    flux0: Vec<f64>,
+    flux1: Vec<f64>,
+    fission_source: Vec<f64>,
+    k: Vec<f64>,
 }
 
 // If multithreading the input processing
@@ -288,54 +294,17 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh>
     let mut mesh: Vec<Mesh> = Vec::with_capacity(temp.len());
 
     let mut mesh_left: f64 = 0.0;
-    let mut mat_left: f64 = 0.0;
-    let mut mat_right: f64 = variables.rodpitch * 0.5;
-    let mut last_item = temp[0];
     for item in temp {
-        if (item == 0 || item == 1) && item != last_item {
-            mat_left = mesh_left;
-            mat_right = mat_left + variables.mpfr as f64 * deltax.fuel;
+        if item == 0 || item == 1 {
             for _x in 0..variables.mpfr {
                 let temp = Mesh {
                     matid: item,
                     delta_x: deltax.fuel,
                     mesh_left: mesh_left,
                     mesh_right: mesh_left + deltax.fuel,
-                    mat_left: mat_left,
-                    mat_right: mat_right,
                 };
                 mesh.push(temp);
                 mesh_left += deltax.fuel;
-                last_item = item
-            }
-        } else if (item == 0 || item == 1) && item == last_item {
-            for _x in 0..variables.mpfr {
-                let temp = Mesh {
-                    matid: item,
-                    delta_x: deltax.fuel,
-                    mesh_left: mesh_left,
-                    mesh_right: mesh_left + deltax.fuel,
-                    mat_left: mat_left,
-                    mat_right: mat_right,
-                };
-                mesh.push(temp);
-                mesh_left += deltax.fuel;
-            }
-        } else if item != last_item {
-            mat_left = mesh_left;
-            mat_right = mat_left + variables.mpwr as f64 * deltax.water;
-            for _x in 0..variables.mpwr {
-                let temp = Mesh {
-                    matid: item,
-                    delta_x: deltax.water,
-                    mesh_left: mesh_left,
-                    mesh_right: mesh_left + deltax.water,
-                    mat_left: mat_left,
-                    mat_right: mat_right,
-                };
-                mesh.push(temp);
-                mesh_left += deltax.water;
-                last_item = item
             }
         } else {
             for _x in 0..variables.mpwr {
@@ -344,8 +313,6 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh>
                     delta_x: deltax.water,
                     mesh_left: mesh_left,
                     mesh_right: mesh_left + deltax.water,
-                    mat_left: mat_left,
-                    mat_right: mat_right,
                 };
                 mesh.push(temp);
                 mesh_left += deltax.water;
@@ -412,52 +379,28 @@ fn tally_calc(
     }
 }
 
-fn hit_boundary(
-    mu: f64,
-    delta_s: f64,
-    boundl: f64,
-    boundr: f64,
-    mesh_left: f64,
-    mesh_right: f64,
-) -> (f64, f64, f64) {
-    if mu < 0.0 {
-        return (mu * (-boundl), delta_s * (-boundl), mesh_left);
-    } else {
-        return (mu * (-boundr), delta_s * (-boundr), mesh_right);
-    }
+fn hit_boundary(mu: f64, start_x: f64, delta_s: f64, bound: f64, mesh_end: f64) -> (f64, f64, f64) {
+    (
+        mu * (-bound),
+        delta_s + (start_x - mesh_end) * (-bound),
+        mesh_end,
+    )
 }
 
 fn cross_mesh(
-    mut tally: Tally,
     mesh_index: usize,
     mu: f64,
-    chi: u8,
     start_x: f64,
     mesh_end: f64,
     delta_s: f64,
-) -> (f64, f64, usize, Tally) {
-    (
-        tally.tally_length0[mesh_index],
-        tally.tally_length1[mesh_index],
-    ) = tally_calc(
-        tally.tally_length0[mesh_index],
-        tally.tally_length1[mesh_index],
-        mesh_end,
-        start_x,
-        mu,
-        chi,
-    );
-    let mesh_index = if mu < 0.0 {
-        mesh_index - 1
-    } else {
+) -> (f64, f64, usize) {
+    let mesh_index = if mu >= 0.0 {
         mesh_index + 1
+    } else {
+        mesh_index - 1
     };
-    (
-        delta_s - (start_x - mesh_end).abs(),
-        mesh_end,
-        mesh_index,
-        tally,
-    )
+
+    (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
 fn interaction(xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
@@ -486,24 +429,21 @@ fn particle_travel(
     mut tally: Tally,
     mut delta_s: f64,
     meshid: &Vec<Mesh>,
-    end_x: f64,
     boundl: f64,
     boundr: f64,
     mattypes: u8,
     xsdata: &XSData,
-) -> (bool, Tally) {
+) -> (bool, usize, Tally) {
     while same_material == true {
-        if (mu < 0.0 && mesh_index == 0 && end_x < meshid[mesh_index].mesh_left)
-            || (mu >= 0.0
-                && mesh_index == meshid.len() - 1
-                && end_x > meshid[mesh_index].mesh_right)
-        {
+        let end_x = start_x + delta_s;
+        let mesh_end = if mu >= 0.0 {
+            meshid[mesh_index].mesh_right
+        } else {
+            meshid[mesh_index].mesh_left
+        };
+
+        if mu * (end_x - mesh_end) >= 0.0 && (mesh_index == 0 || mesh_index == meshid.len() - 1) {
             // hit the boundary
-            let mesh_end = if mu >= 0.0 {
-                meshid[mesh_index].mesh_right
-            } else {
-                meshid[mesh_index].mesh_left
-            };
             (
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
@@ -515,27 +455,25 @@ fn particle_travel(
                 mu,
                 chi,
             );
-            (mu, delta_s, start_x) = hit_boundary(
-                mu,
-                delta_s,
-                boundl,
-                boundr,
-                meshid[mesh_index].mesh_left,
-                meshid[mesh_index].mesh_right,
-            );
-        } else if (mu < 0.0 && end_x < meshid[mesh_index].mesh_left)
-            || (mu >= 0.0 && end_x > meshid[mesh_index].mesh_right)
-        {
+            let bound = if mu >= 0.0 { boundr } else { boundl };
+            (mu, delta_s, start_x) = hit_boundary(mu, start_x, delta_s, bound, mesh_end);
+        } else if mu * (end_x - mesh_end) >= 0.0 {
             // cross mesh boundary
-            let mesh_end = if mu < 0.0 {
-                meshid[mesh_index].mesh_left
-            } else {
-                meshid[mesh_index].mesh_right
-            };
+            (
+                tally.tally_length0[mesh_index],
+                tally.tally_length1[mesh_index],
+            ) = tally_calc(
+                tally.tally_length0[mesh_index],
+                tally.tally_length1[mesh_index],
+                mesh_end,
+                start_x,
+                mu,
+                chi,
+            );
 
             let prev_mat = meshid[mesh_index].matid;
-            (delta_s, start_x, mesh_index, tally) =
-                cross_mesh(tally, mesh_index, mu, chi, start_x, mesh_end, delta_s);
+
+            (delta_s, start_x, mesh_index) = cross_mesh(mesh_index, mu, start_x, mesh_end, delta_s);
 
             if prev_mat != meshid[mesh_index].matid {
                 same_material = false;
@@ -553,16 +491,19 @@ fn particle_travel(
                 mu,
                 chi,
             );
+
             let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
             let (particle_exists, _chi, _mu) = interaction(&xsdata, xs_index, chi);
             if particle_exists == false {
-                return (particle_exists, tally);
+                return (particle_exists, mesh_index, tally);
             }
             chi = _chi;
             mu = _mu;
+            delta_s = mu * thread_rng().gen::<f64>().ln()
+                / xsdata.sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
         }
     }
-    return (true, tally);
+    (true, mesh_index, tally)
 }
 
 fn particle_lifetime(
@@ -570,7 +511,7 @@ fn particle_lifetime(
     start_x: f64,
     mu: f64,
     chi: u8,
-    mesh_index: usize,
+    mut mesh_index: usize,
     mut tally: Tally,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
@@ -583,8 +524,7 @@ fn particle_lifetime(
 
         let same_material: bool = true;
 
-        let end_x = start_x + delta_s;
-        (particle_exists, tally) = particle_travel(
+        (particle_exists, mesh_index, tally) = particle_travel(
             same_material,
             start_x,
             mu,
@@ -593,7 +533,6 @@ fn particle_lifetime(
             tally,
             delta_s,
             meshid,
-            end_x,
             variables.boundl,
             variables.boundr,
             variables.mattypes,
@@ -603,17 +542,30 @@ fn particle_lifetime(
     return tally;
 }
 
-fn monte_carlo(variables: &Variables, xsdata: &XSData, delta_x: &DeltaX, meshid: &Vec<Mesh>) {
-    let mut k = 1.0;
+fn monte_carlo(
+    variables: &Variables,
+    xsdata: &XSData,
+    delta_x: &DeltaX,
+    meshid: &Vec<Mesh>,
+    mut k_new: f64,
+) -> SoltuionResults {
     println!("running monte carlo code");
     let mut tally = Tally {
         tally_length0: vec![0.0; meshid.len()],
         tally_length1: vec![0.0; meshid.len()],
     };
+    let mut results = SoltuionResults {
+        flux0: vec![0.0; meshid.len()],
+        flux1: vec![0.0; meshid.len()],
+        fission_source: vec![0.0; meshid.len()],
+        k: vec![0.0; variables.generations],
+    };
+
     for x in 0..variables.generations {
+        let k = k_new;
+        k_new = 0.0;
         println!("Starting Generation {x}");
-        for y in 0..variables.histories {
-            println!("spawn particle {y} in generation {x}");
+        for _y in 0..variables.histories {
             // spawn_sub_mesh is the partial distance through the mesh
             let (mesh_index, spawn_sub_mesh, mu, chi) = spawn_neutron(&variables, &delta_x);
 
@@ -633,16 +585,113 @@ fn monte_carlo(variables: &Variables, xsdata: &XSData, delta_x: &DeltaX, meshid:
                 variables,
             )
         }
-        let flux0: Vec<f64> = (0..tally.tally_length0.len())
-            .into_iter()
-            .map(|x| tally.tally_length0[x] / (k * variables.histories as f64 * meshid[x].delta_x))
-            .collect();
-        let flux1: Vec<f64> = (0..tally.tally_length1.len())
-            .into_iter()
-            .map(|x| tally.tally_length1[x] / (k * variables.histories as f64 * meshid[x].delta_x))
-            .collect();
-        let fission_source = 
+
+        let ((flux0, flux1), fission_source): ((Vec<f64>, Vec<f64>), Vec<f64>) =
+            (0..tally.tally_length0.len())
+                .into_iter()
+                .map(|x| {
+                    let delta_x = meshid[x].delta_x;
+                    let matid = meshid[x].matid;
+                    let flux0 = tally.tally_length0[x] / (k * variables.histories as f64 * delta_x);
+                    let fission_source0 =
+                        xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux0;
+                    let flux1 = tally.tally_length1[x] / (k * variables.histories as f64 * delta_x);
+                    let fission_source1 = xsdata.nut[(matid + variables.mattypes) as usize]
+                        * xsdata.sigf[(matid + variables.mattypes) as usize]
+                        * flux1;
+                    let fission_source = fission_source1 + fission_source0;
+                    k_new += delta_x * fission_source;
+                    return ((flux0, flux1), fission_source);
+                })
+                .unzip();
+
+        for index in 0..meshid.len() {
+            results.flux0[index] += flux0[index];
+            results.flux1[index] += flux1[index];
+            results.fission_source[index] += fission_source[index];
+        }
+
+        // results.flux0 = results
+        //     .flux0
+        //     .iter()
+        //     .zip(&flux0)
+        //     .map(|(a, b)| a + b)
+        //     .collect();
+        // results.flux1 = results
+        //     .flux1
+        //     .iter()
+        //     .zip(&flux1)
+        //     .map(|(a, b)| a + b)
+        //     .collect();
+        // results.fission_source = results
+        //     .fission_source
+        //     .iter()
+        //     .zip(&fission_source)
+        //     .map(|(a, b)| a + b)
+        //     .collect();
+        // results.k.push(k);
+
+        println!("k_new is {}", k_new);
     }
+    results
+}
+
+fn plot_solution(results: SoltuionResults) -> Result<(), StrError> {
+    let x: Vec<f64> = (0..results.flux0.len())
+        .into_iter()
+        .map(|x| x as f64)
+        .collect();
+
+    // configure and draw curves
+    let mut curve1 = Curve::new();
+    let mut curve2 = Curve::new();
+    let mut curve3 = Curve::new();
+    let mut curve4 = Curve::new();
+    curve1.set_label("Keff");
+    curve2.set_label("fast flux").set_line_color("#cd0000");
+    curve3.set_label("thermal flux").set_line_color("#e79955");
+    curve4
+        .set_label("fission density")
+        .set_line_color("#b566ab");
+    curve1.draw(&x, &results.k);
+    curve2.draw(&x, &results.flux0);
+    curve3.draw(&x, &results.flux1);
+    curve4.draw(&x, &results.fission_source);
+
+    // configure plot
+    let mut plot = Plot::new();
+    plot.set_super_title("FOUR CURVES", None)
+        .set_gaps(0.35, 0.5);
+
+    // add curve to subplot
+    plot.set_subplot(2, 2, 1)
+        .set_title("Keff")
+        .add(&curve1)
+        .grid_labels_legend("x", "y")
+        .set_equal_axes(true);
+
+    // add curve to subplot
+    plot.set_subplot(2, 2, 2)
+        .set_title("fast flux")
+        .add(&curve2)
+        .grid_labels_legend("x", "y");
+
+    // add curve to subplot
+    plot.set_subplot(2, 2, 3)
+        .set_title("thermal flux")
+        .add(&curve3)
+        .set_range(-1.0, 1.0, 0.0, 6.0)
+        .grid_labels_legend("x", "y");
+
+    // add curve to subplot
+    plot.set_subplot(2, 2, 4)
+        .set_title("fission density")
+        .add(&curve4)
+        .grid_labels_legend("x", "y");
+
+    // save figure
+    plot.save("/tmp/plotpy/doc_tests/doc_plot.svg")?;
+    Ok(())
 }
 fn main() {
     let (variables, xsdata, matid, deltax, solution) = process_input();
@@ -650,10 +699,17 @@ fn main() {
     // index meshid via [assembly# * rod#]
     let meshid = mesh_gen(matid, &variables, &deltax);
 
-    match solution {
-        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid),
-        _ => {} // not implemented
-    }
+    let results = match solution {
+        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, 1.0),
+        _ => SoltuionResults {
+            flux0: Vec::new(),
+            flux1: Vec::new(),
+            fission_source: Vec::new(),
+            k: Vec::new(),
+        }, // not implemented
+    };
+
+    plot_solution(results);
 
     // below is for timing
     // let mut now = SystemTime::now();
