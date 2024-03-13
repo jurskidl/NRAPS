@@ -63,7 +63,12 @@ struct Mesh {
     mat_right: f64,
 }
 
-// If multithreading
+struct Tally {
+    tally_length0: Vec<f64>,
+    tally_length1: Vec<f64>,
+}
+
+// If multithreading the input processing
 // fn next_end_line(mut end: usize, buffer: &[u8]) -> usize {
 //     while buffer[end] != NEWLINE && end < buffer.len() {
 //         end += 1;
@@ -351,7 +356,7 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh>
     mesh
 }
 
-fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, u8) {
+fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, f64, u8) {
     let spawn_string: String = thread_rng()
         .gen_range(1.0..(variables.numass * variables.numrods) as f64)
         .to_string();
@@ -363,7 +368,7 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, u8) {
         .to_string();
     let (temp2_int, temp2_dec) = temp2.split_once(".").unzip();
     let temp_energy: f64 = thread_rng().gen();
-    let chi = if temp_energy >= 0.7 { 1 } else { 2 };
+    let chi = if temp_energy >= 0.7 { 0 } else { 1 };
     match variables.energygroups {
         4 => {
             return (
@@ -373,6 +378,7 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, u8) {
                 ("0.".to_string() + temp2_dec.unwrap())
                     .parse::<f64>()
                     .unwrap(),
+                2.0 * (thread_rng().gen::<f64>()) - 1.0,
                 chi,
             )
         }
@@ -384,160 +390,258 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, u8) {
                 ("0.".to_string() + temp2_dec.unwrap())
                     .parse::<f64>()
                     .unwrap(),
-                chi,
+                2.0 * (thread_rng().gen::<f64>()) - 1.0,
+                0,
             )
         }
     }
 }
 
+fn tally_calc(
+    tally0: f64,
+    tally1: f64,
+    mesh_end: f64,
+    start_x: f64,
+    mu: f64,
+    chi: u8,
+) -> (f64, f64) {
+    match chi {
+        0 => return (tally0 + ((start_x - mesh_end).abs() / mu), tally1),
+        1 => return (tally0, tally1 + ((start_x - mesh_end).abs() / mu)),
+        _ => (0.0, 0.0),
+    }
+}
+
+fn hit_boundary(
+    mu: f64,
+    delta_s: f64,
+    boundl: f64,
+    boundr: f64,
+    mesh_left: f64,
+    mesh_right: f64,
+) -> (f64, f64, f64) {
+    if mu < 0.0 {
+        return (mu * (-boundl), delta_s * (-boundl), mesh_left);
+    } else {
+        return (mu * (-boundr), delta_s * (-boundr), mesh_right);
+    }
+}
+
+fn cross_mesh(
+    mut tally: Tally,
+    mesh_index: usize,
+    mu: f64,
+    chi: u8,
+    start_x: f64,
+    mesh_end: f64,
+    delta_s: f64,
+) -> (f64, f64, usize, Tally) {
+    (
+        tally.tally_length0[mesh_index],
+        tally.tally_length1[mesh_index],
+    ) = tally_calc(
+        tally.tally_length0[mesh_index],
+        tally.tally_length1[mesh_index],
+        mesh_end,
+        start_x,
+        mu,
+        chi,
+    );
+    let mesh_index = if mu < 0.0 {
+        mesh_index - 1
+    } else {
+        mesh_index + 1
+    };
+    (
+        delta_s - (start_x - mesh_end).abs(),
+        mesh_end,
+        mesh_index,
+        tally,
+    )
+}
+
+fn interaction(xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
+    let interaction = thread_rng().gen_range(0.0..xsdata.sigtr[xs_index]);
+    let in_scatter = xsdata.sigis[xs_index];
+    let down_scatter = in_scatter + xsdata.sigds[xs_index];
+    let absorption = down_scatter + xsdata.siga[xs_index];
+    if interaction <= in_scatter {
+        return (true, chi, 2.0 * (thread_rng().gen::<f64>()) - 1.0);
+    } else if interaction <= down_scatter {
+        return (true, chi + 1, 2.0 * (thread_rng().gen::<f64>()) - 1.0);
+    } else if interaction <= absorption {
+        return (false, chi, 0.0);
+    } else {
+        //fission
+        return (false, chi, 0.0);
+    }
+}
+
+fn particle_travel(
+    mut same_material: bool,
+    mut start_x: f64,
+    mut mu: f64,
+    mut chi: u8,
+    mut mesh_index: usize,
+    mut tally: Tally,
+    mut delta_s: f64,
+    meshid: &Vec<Mesh>,
+    end_x: f64,
+    boundl: f64,
+    boundr: f64,
+    mattypes: u8,
+    xsdata: &XSData,
+) -> (bool, Tally) {
+    while same_material == true {
+        if (mu < 0.0 && mesh_index == 0 && end_x < meshid[mesh_index].mesh_left)
+            || (mu >= 0.0
+                && mesh_index == meshid.len() - 1
+                && end_x > meshid[mesh_index].mesh_right)
+        {
+            // hit the boundary
+            let mesh_end = if mu >= 0.0 {
+                meshid[mesh_index].mesh_right
+            } else {
+                meshid[mesh_index].mesh_left
+            };
+            (
+                tally.tally_length0[mesh_index],
+                tally.tally_length1[mesh_index],
+            ) = tally_calc(
+                tally.tally_length0[mesh_index],
+                tally.tally_length1[mesh_index],
+                mesh_end,
+                start_x,
+                mu,
+                chi,
+            );
+            (mu, delta_s, start_x) = hit_boundary(
+                mu,
+                delta_s,
+                boundl,
+                boundr,
+                meshid[mesh_index].mesh_left,
+                meshid[mesh_index].mesh_right,
+            );
+        } else if (mu < 0.0 && end_x < meshid[mesh_index].mesh_left)
+            || (mu >= 0.0 && end_x > meshid[mesh_index].mesh_right)
+        {
+            // cross mesh boundary
+            let mesh_end = if mu < 0.0 {
+                meshid[mesh_index].mesh_left
+            } else {
+                meshid[mesh_index].mesh_right
+            };
+
+            let prev_mat = meshid[mesh_index].matid;
+            (delta_s, start_x, mesh_index, tally) =
+                cross_mesh(tally, mesh_index, mu, chi, start_x, mesh_end, delta_s);
+
+            if prev_mat != meshid[mesh_index].matid {
+                same_material = false;
+            }
+        } else {
+            // interaction
+            (
+                tally.tally_length0[mesh_index],
+                tally.tally_length1[mesh_index],
+            ) = tally_calc(
+                tally.tally_length0[mesh_index],
+                tally.tally_length1[mesh_index],
+                end_x,
+                start_x,
+                mu,
+                chi,
+            );
+            let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
+            let (particle_exists, _chi, _mu) = interaction(&xsdata, xs_index, chi);
+            if particle_exists == false {
+                return (particle_exists, tally);
+            }
+            chi = _chi;
+            mu = _mu;
+        }
+    }
+    return (true, tally);
+}
+
+fn particle_lifetime(
+    mut particle_exists: bool,
+    start_x: f64,
+    mu: f64,
+    chi: u8,
+    mesh_index: usize,
+    mut tally: Tally,
+    xsdata: &XSData,
+    meshid: &Vec<Mesh>,
+    variables: &Variables,
+) -> Tally {
+    while particle_exists == true {
+        let s: f64 = thread_rng().gen::<f64>().ln()
+            / xsdata.sigtr[(meshid[mesh_index].matid + variables.mattypes * (chi)) as usize];
+        let delta_s: f64 = mu * s;
+
+        let same_material: bool = true;
+
+        let end_x = start_x + delta_s;
+        (particle_exists, tally) = particle_travel(
+            same_material,
+            start_x,
+            mu,
+            chi,
+            mesh_index,
+            tally,
+            delta_s,
+            meshid,
+            end_x,
+            variables.boundl,
+            variables.boundr,
+            variables.mattypes,
+            xsdata,
+        );
+    }
+    return tally;
+}
+
 fn monte_carlo(variables: &Variables, xsdata: &XSData, delta_x: &DeltaX, meshid: &Vec<Mesh>) {
-    println!("ruunning monte carlo code");
+    let mut k = 1.0;
+    println!("running monte carlo code");
+    let mut tally = Tally {
+        tally_length0: vec![0.0; meshid.len()],
+        tally_length1: vec![0.0; meshid.len()],
+    };
     for x in 0..variables.generations {
         println!("Starting Generation {x}");
-        let mut next_gen: f64 = 0.0;
-        for _y in 0..variables.histories {
+        for y in 0..variables.histories {
+            println!("spawn particle {y} in generation {x}");
             // spawn_sub_mesh is the partial distance through the mesh
-            let (mut mesh_index, spawn_sub_mesh, mut chi): (usize, f64, u8) =
-                spawn_neutron(&variables, &delta_x);
-            let mut mu: f64 = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
-            let mut particle_exists: bool = true;
+            let (mesh_index, spawn_sub_mesh, mu, chi) = spawn_neutron(&variables, &delta_x);
 
-            while particle_exists == true {
-                let s: f64 = thread_rng().gen::<f64>().ln()
-                    / xsdata.sigtr
-                        [(meshid[mesh_index].matid + variables.mattypes * (chi - 1)) as usize];
-                let mut delta_s: f64 = mu * s;
+            let particle_exists: bool = true;
 
-                let mut same_material: bool = true;
-                let mut start_x: f64 = meshid[mesh_index].mesh_left + spawn_sub_mesh;
+            let start_x: f64 = meshid[mesh_index].mesh_left + spawn_sub_mesh;
 
-                let end_x = start_x + delta_s;
-                while same_material == true {
-                    if (mu < 0.0 && mesh_index == 0 && end_x < meshid[mesh_index].mesh_left)
-                        || (mu >= 0.0
-                            && mesh_index == meshid.len() - 1
-                            && end_x > meshid[mesh_index].mesh_right)
-                    {
-                        // println!("Hitting the boundary");
-                        if mu < 0.0 {
-                            // tally_length[mesh_index] +=
-                            //     (meshid[mesh_index].mesh_left - start_x).abs() / mu;
-                            mu *= -variables.boundl;
-                            delta_s *= -variables.boundl;
-                            start_x = meshid[mesh_index].mesh_left;
-                        } else {
-                            // tally_length[mesh_index] +=
-                            //     (meshid[mesh_index].mesh_right - start_x) / mu;
-                            mu *= -variables.boundr;
-                            delta_s *= -variables.boundr;
-                            start_x = meshid[mesh_index].mesh_right;
-                        }
-                    } else if mu < 0.0 && end_x < meshid[mesh_index].mat_left {
-                        // println!("exiting mat left");
-                        // tally_length[mesh_index] +=
-                        //     (meshid[mesh_index].mesh_left - start_x) / mu;
-                        mesh_index -= 1;
-                        while meshid[mesh_index].matid != meshid[mesh_index - 1].matid {
-                            // tally_length[mesh_index] +=
-                            //     (meshid[mesh_index].mesh_left - meshid[meshindex].mesh_right) / mu;
-                            if mesh_index == 1 {
-                                break;
-                            }
-                            mesh_index -= 1;
-                        }
-                        same_material = false;
-                    } else if mu < 0.0 && end_x < meshid[mesh_index].mesh_left {
-                        // println!("exiting mesh left");
-                        // tally_length[mesh_index] +=
-                        //     (meshid[mesh_index].mesh_left - start_x) / mu;
-                        delta_s -= start_x - meshid[mesh_index].mesh_left;
-                        start_x = meshid[mesh_index].mesh_left;
-                        mesh_index -= 1;
-                    } else if mu < 0.0 {
-                        // println!("interacting left");
-                        // tally_length[mesh_index] +=
-                        //     (meshid[mesh_index].mesh_left - start_x) / mu
-                        let xs_index: usize =
-                            (meshid[mesh_index].matid + variables.mattypes * (chi - 1)) as usize;
-                        let interaction = thread_rng().gen_range(0.0..xsdata.sigtr[xs_index]);
-                        if interaction <= xsdata.sigis[xs_index] {
-                            // println!("in scatter");
-                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
-                        } else if interaction <= xsdata.sigis[xs_index] + xsdata.sigds[xs_index] {
-                            // println!("down scatter");
-                            chi += 1;
-                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
-                        } else if interaction
-                            <= xsdata.sigis[xs_index]
-                                + xsdata.sigds[xs_index]
-                                + xsdata.siga[xs_index]
-                        {
-                            // println!("absorption");
-                            particle_exists = false;
-                            same_material = false;
-                        } else {
-                            // println!("fission");
-                            next_gen += xsdata.nut[xs_index];
-                            particle_exists = false;
-                            same_material = false;
-                        }
-                    } else if mu >= 0.0 && end_x > meshid[mesh_index].mat_right {
-                        // println!(" exiting mat right");
-                        // tally_length[mesh_index] +=
-                        //     (meshid[mesh_index].mesh_right - start_x) / mu;
-                        mesh_index += 1;
-                        while meshid[mesh_index - 1].matid == meshid[mesh_index].matid
-                            && mesh_index < (meshid.len() - 1)
-                        {
-                            // tally_length[mesh_index] +=
-                            //     (meshid[mesh_index].mesh_right - meshid[meshindex].mesh_left) / mu;
-                            mesh_index += 1;
-                        }
-
-                        if mesh_index != meshid.len() - 1 {
-                            same_material = false
-                        }
-                    } else if mu >= 0.0 && end_x > meshid[mesh_index].mesh_right {
-                        // println!("exiting mesh right");
-                        // tally_length[mesh_index] +=
-                        //     (meshid[mesh_index].mesh_right - start_x) / mu;
-                        delta_s += meshid[mesh_index].mesh_right - start_x;
-                        start_x = meshid[mesh_index].mesh_right;
-                        mesh_index += 1;
-                    } else {
-                        // println!("interacting right");
-                        // tally_length[mesh_index] +=
-                        //     (meshid[mesh_index].mesh_right - start_x) / mu;
-                        let xs_index: usize =
-                            (meshid[mesh_index].matid + variables.mattypes * (chi - 1)) as usize;
-                        let interaction = thread_rng().gen_range(0.0..xsdata.sigtr[xs_index]);
-                        if interaction <= xsdata.sigis[xs_index] {
-                            // println!("in scatter");
-                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
-                        } else if interaction <= xsdata.sigis[xs_index] + xsdata.sigds[xs_index] {
-                            // println!("down scatter");
-                            chi += 1;
-                            mu = 2.0 * (thread_rng().gen::<f64>()) - 1.0;
-                        } else if interaction
-                            <= xsdata.sigis[xs_index]
-                                + xsdata.sigds[xs_index]
-                                + xsdata.siga[xs_index]
-                        {
-                            // println!("absorption");
-                            particle_exists = false;
-                            same_material = false;
-                        } else {
-                            // println!("fission!");
-                            next_gen += xsdata.nut[xs_index];
-                            particle_exists = false;
-                            same_material = false;
-                        }
-                    }
-                }
-            }
+            tally = particle_lifetime(
+                particle_exists,
+                start_x,
+                mu,
+                chi,
+                mesh_index,
+                tally,
+                xsdata,
+                meshid,
+                variables,
+            )
         }
-
-        println!("keff would be {}", next_gen / variables.histories as f64);
+        let flux0: Vec<f64> = (0..tally.tally_length0.len())
+            .into_iter()
+            .map(|x| tally.tally_length0[x] / (k * variables.histories as f64 * meshid[x].delta_x))
+            .collect();
+        let flux1: Vec<f64> = (0..tally.tally_length1.len())
+            .into_iter()
+            .map(|x| tally.tally_length1[x] / (k * variables.histories as f64 * meshid[x].delta_x))
+            .collect();
+        let fission_source = 
     }
 }
 fn main() {
