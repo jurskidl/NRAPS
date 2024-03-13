@@ -1,10 +1,10 @@
+use csv::Writer;
 use memmap2::MmapOptions;
 use rand::prelude::*;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fs::File;
 use std::iter::repeat;
-use csv::Writer;
-use std::error::Error;
 // For Multithreading
 // use std::thread;
 // Use these for timing
@@ -292,32 +292,30 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh>
     temp.drain(0..(variables.mpwr / 2));
     temp.truncate(temp.len() - (variables.mpwr / 2));
 
+    println!("{}", temp.len());
+
     let mut mesh: Vec<Mesh> = Vec::with_capacity(temp.len());
 
     let mut mesh_left: f64 = 0.0;
     for item in temp {
         if item == 0 || item == 1 {
-            for _x in 0..variables.mpfr {
-                let temp = Mesh {
-                    matid: item,
-                    delta_x: deltax.fuel,
-                    mesh_left: mesh_left,
-                    mesh_right: mesh_left + deltax.fuel,
-                };
-                mesh.push(temp);
-                mesh_left += deltax.fuel;
-            }
+            let temp = Mesh {
+                matid: item,
+                delta_x: deltax.fuel,
+                mesh_left: mesh_left,
+                mesh_right: mesh_left + deltax.fuel,
+            };
+            mesh.push(temp);
+            mesh_left += deltax.fuel;
         } else {
-            for _x in 0..variables.mpwr {
-                let temp = Mesh {
-                    matid: item,
-                    delta_x: deltax.water,
-                    mesh_left: mesh_left,
-                    mesh_right: mesh_left + deltax.water,
-                };
-                mesh.push(temp);
-                mesh_left += deltax.water;
-            }
+            let temp = Mesh {
+                matid: item,
+                delta_x: deltax.water,
+                mesh_left: mesh_left,
+                mesh_right: mesh_left + deltax.water,
+            };
+            mesh.push(temp);
+            mesh_left += deltax.water;
         }
     }
 
@@ -612,6 +610,8 @@ fn monte_carlo(
             results.fission_source[index] += fission_source[index];
         }
 
+        results.k[x] = k;
+
         // results.flux0 = results
         //     .flux0
         //     .iter()
@@ -630,7 +630,6 @@ fn monte_carlo(
         //     .zip(&fission_source)
         //     .map(|(a, b)| a + b)
         //     .collect();
-        results.k.push(k);
 
         println!("k is {}", k);
     }
@@ -646,7 +645,11 @@ fn plot_solution(results: SoltuionResults) -> Result<(), Box<dyn Error>> {
     let output_k: Vec<String> = results.k.iter().map(|x| x.to_string()).collect();
     let output_flux0: Vec<String> = results.flux0.iter().map(|x| x.to_string()).collect();
     let output_flux1: Vec<String> = results.flux1.iter().map(|x| x.to_string()).collect();
-    let output_fission: Vec<String> = results.fission_source.iter().map(|x| x.to_string()).collect();
+    let output_fission: Vec<String> = results
+        .fission_source
+        .iter()
+        .map(|x| x.to_string())
+        .collect();
 
     let mut wtr_k = Writer::from_path("../k_eff.csv")?;
 
