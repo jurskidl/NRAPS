@@ -629,68 +629,67 @@ fn monte_carlo(
         //     .zip(&fission_source)
         //     .map(|(a, b)| a + b)
         //     .collect();
-        // results.k.push(k);
+        results.k.push(k);
 
-        println!("k_new is {}", k_new);
+        println!("k is {}", k);
     }
     results
 }
 
 fn plot_solution(results: SoltuionResults) -> Result<(), StrError> {
-    let x: Vec<f64> = (0..results.flux0.len())
+    let _x: Vec<f64> = (0..results.flux0.len())
         .into_iter()
         .map(|x| x as f64)
         .collect();
 
-    // configure and draw curves
-    let mut curve1 = Curve::new();
-    let mut curve2 = Curve::new();
-    let mut curve3 = Curve::new();
-    let mut curve4 = Curve::new();
-    curve1.set_label("Keff");
-    curve2.set_label("fast flux").set_line_color("#cd0000");
-    curve3.set_label("thermal flux").set_line_color("#e79955");
-    curve4
-        .set_label("fission density")
-        .set_line_color("#b566ab");
-    curve1.draw(&x, &results.k);
-    curve2.draw(&x, &results.flux0);
-    curve3.draw(&x, &results.flux1);
-    curve4.draw(&x, &results.fission_source);
+    // // configure and draw curves
+    // let mut curve1 = Curve::new();
+    // let mut curve2 = Curve::new();
+    // let mut curve3 = Curve::new();
+    // let mut curve4 = Curve::new();
+    // curve1.set_label("Keff");
+    // curve2.set_label("fast flux").set_line_color("#cd0000");
+    // curve3.set_label("thermal flux").set_line_color("#e79955");
+    // curve4
+    //     .set_label("fission density")
+    //     .set_line_color("#b566ab");
+    // curve1.draw(&x, &results.k);
+    // curve2.draw(&x, &results.flux0);
+    // curve3.draw(&x, &results.flux1);
+    // curve4.draw(&x, &results.fission_source);
 
-    // configure plot
-    let mut plot = Plot::new();
-    plot.set_super_title("FOUR CURVES", None)
-        .set_gaps(0.35, 0.5);
+    // // configure plot
+    // let mut plot = Plot::new();
+    // plot.set_super_title("FOUR CURVES", None)
+    //     .set_gaps(0.35, 0.5);
 
-    // add curve to subplot
-    plot.set_subplot(2, 2, 1)
-        .set_title("Keff")
-        .add(&curve1)
-        .grid_labels_legend("x", "y")
-        .set_equal_axes(true);
+    // // add curve to subplot
+    // plot.set_subplot(2, 2, 1)
+    //     .set_title("Keff")
+    //     .add(&curve1)
+    //     .grid_labels_legend("x", "y")
+    //     .set_equal_axes(true);
 
-    // add curve to subplot
-    plot.set_subplot(2, 2, 2)
-        .set_title("fast flux")
-        .add(&curve2)
-        .grid_labels_legend("x", "y");
+    // // add curve to subplot
+    // plot.set_subplot(2, 2, 2)
+    //     .set_title("fast flux")
+    //     .add(&curve2)
+    //     .grid_labels_legend("x", "y");
 
-    // add curve to subplot
-    plot.set_subplot(2, 2, 3)
-        .set_title("thermal flux")
-        .add(&curve3)
-        .set_range(-1.0, 1.0, 0.0, 6.0)
-        .grid_labels_legend("x", "y");
+    // // add curve to subplot
+    // plot.set_subplot(2, 2, 3)
+    //     .set_title("thermal flux")
+    //     .add(&curve3)
+    //     .grid_labels_legend("x", "y");
 
-    // add curve to subplot
-    plot.set_subplot(2, 2, 4)
-        .set_title("fission density")
-        .add(&curve4)
-        .grid_labels_legend("x", "y");
+    // // add curve to subplot
+    // plot.set_subplot(2, 2, 4)
+    //     .set_title("fission density")
+    //     .add(&curve4)
+    //     .grid_labels_legend("x", "y");
 
-    // save figure
-    plot.save("../doc_plot.svg")?;
+    // // save figure
+    // plot.save("../doc_plot.svg")?;
     Ok(())
 }
 fn main() {
@@ -709,7 +708,7 @@ fn main() {
         }, // not implemented
     };
 
-    plot_solution(results);
+    let _ = plot_solution(results);
 
     // below is for timing
     // let mut now = SystemTime::now();
