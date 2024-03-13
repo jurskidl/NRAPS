@@ -690,7 +690,7 @@ fn plot_solution(results: SoltuionResults) -> Result<(), StrError> {
         .grid_labels_legend("x", "y");
 
     // save figure
-    plot.save("/tmp/plotpy/doc_tests/doc_plot.svg")?;
+    plot.save("../doc_plot.svg")?;
     Ok(())
 }
 fn main() {
