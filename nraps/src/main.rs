@@ -1,9 +1,10 @@
 use memmap2::MmapOptions;
-use plotpy::{Curve, Plot, StrError};
 use rand::prelude::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::iter::repeat;
+use csv::Writer;
+use std::error::Error;
 // For Multithreading
 // use std::thread;
 // Use these for timing
@@ -636,11 +637,30 @@ fn monte_carlo(
     results
 }
 
-fn plot_solution(results: SoltuionResults) -> Result<(), StrError> {
-    let _x: Vec<f64> = (0..results.flux0.len())
-        .into_iter()
-        .map(|x| x as f64)
-        .collect();
+fn plot_solution(results: SoltuionResults) -> Result<(), Box<dyn Error>> {
+    // let x: Vec<usize> = (0..results.flux0.len())
+    //     .into_iter()
+    //     .map(|x| x)
+    //     .collect();
+
+    let output_k: Vec<String> = results.k.iter().map(|x| x.to_string()).collect();
+    let output_flux0: Vec<String> = results.flux0.iter().map(|x| x.to_string()).collect();
+    let output_flux1: Vec<String> = results.flux1.iter().map(|x| x.to_string()).collect();
+    let output_fission: Vec<String> = results.fission_source.iter().map(|x| x.to_string()).collect();
+
+    let mut wtr_k = Writer::from_path("../k_eff.csv")?;
+
+    wtr_k.write_record(&output_k)?;
+    wtr_k.flush()?;
+
+    let mut wtr = Writer::from_path("../interface.csv")?;
+
+    wtr.write_record(&output_flux0)?;
+    wtr.write_record(&output_flux1)?;
+    wtr.write_record(&output_fission)?;
+    wtr.flush()?;
+
+    Ok(())
 
     // // configure and draw curves
     // let mut curve1 = Curve::new();
@@ -690,7 +710,6 @@ fn plot_solution(results: SoltuionResults) -> Result<(), StrError> {
 
     // // save figure
     // plot.save("../doc_plot.svg")?;
-    Ok(())
 }
 fn main() {
     let (variables, xsdata, matid, deltax, solution) = process_input();
