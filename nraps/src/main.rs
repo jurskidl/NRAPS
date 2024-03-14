@@ -372,7 +372,7 @@ fn tally_calc(
     match chi {
         0 => return (tally0 + ((start_x - mesh_end) / mu).abs(), tally1),
         1 => return (tally0, tally1 + ((start_x - mesh_end) / mu).abs()),
-        _ => (0.0, 0.0),
+        _ => (tally0, tally1),
     }
 }
 
@@ -418,7 +418,10 @@ fn interaction(xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
 }
 
 fn particle_travel(
-    y: usize,
+    mut this_particle: bool,
+    mut this_particle1: bool,
+    mut count: usize,
+    mut count1: usize,
     mut same_material: bool,
     mut start_x: f64,
     mut mu: f64,
@@ -431,11 +434,13 @@ fn particle_travel(
     boundr: f64,
     mattypes: u8,
     xsdata: &XSData,
-) -> (bool, usize, Tally) {
+) -> (bool, bool, bool, usize, Tally, usize, usize) {
     while same_material == true {
         let end_x = start_x + delta_s;
-        if chi == 1 {
-            println!("thermal");
+        if chi == 1 && this_particle != true {
+            // println!("thermal");
+            this_particle = true;
+            count += 1;
         };
         let mesh_end = if mu >= 0.0 {
             meshid[mesh_index].mesh_right
@@ -493,14 +498,24 @@ fn particle_travel(
                 chi,
             );
 
-            if chi == 1 {
-                println!("thermal");
+            if chi == 1 && this_particle && this_particle1 != true {
+                // println!("thermal");
+                this_particle1 = true;
+                count1 += 1;
             }
 
             let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
             let (particle_exists, _chi, _mu) = interaction(&xsdata, xs_index, chi);
             if particle_exists == false {
-                return (particle_exists, mesh_index, tally);
+                return (
+                    this_particle,
+                    this_particle1,
+                    particle_exists,
+                    mesh_index,
+                    tally,
+                    count,
+                    count1,
+                );
             }
             chi = _chi;
             mu = _mu;
@@ -509,11 +524,23 @@ fn particle_travel(
                 * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
         }
     }
-    (true, mesh_index, tally)
+    (
+        this_particle,
+        this_particle1,
+        true,
+        mesh_index,
+        tally,
+        count,
+        count1,
+    )
 }
 
 fn particle_lifetime(
+    mut this_particle: bool,
+    mut this_particle1: bool,
     y: usize,
+    mut count: usize,
+    mut count1: usize,
     mut particle_exists: bool,
     start_x: f64,
     mu: f64,
@@ -523,7 +550,7 @@ fn particle_lifetime(
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
     variables: &Variables,
-) -> Tally {
+) -> (Tally, usize, usize) {
     while particle_exists == true {
         let s: f64 = -thread_rng().gen::<f64>().ln()
             * xsdata.inv_sigtr[(meshid[mesh_index].matid + variables.mattypes * (chi)) as usize];
@@ -531,8 +558,19 @@ fn particle_lifetime(
 
         let same_material: bool = true;
 
-        (particle_exists, mesh_index, tally) = particle_travel(
-            y,
+        (
+            this_particle,
+            this_particle1,
+            particle_exists,
+            mesh_index,
+            tally,
+            count,
+            count1,
+        ) = particle_travel(
+            this_particle,
+            this_particle1,
+            count,
+            count1,
             same_material,
             start_x,
             mu,
@@ -547,7 +585,7 @@ fn particle_lifetime(
             xsdata,
         );
     }
-    return tally;
+    return (tally, count, count1);
 }
 
 fn monte_carlo(
@@ -557,6 +595,8 @@ fn monte_carlo(
     meshid: &Vec<Mesh>,
     mut k_new: f64,
 ) -> SoltuionResults {
+    let mut count = 0;
+    let mut count1 = 0;
     // println!("running monte carlo code");
     let mut results = SoltuionResults {
         flux0: vec![0.0; meshid.len()],
@@ -578,11 +618,17 @@ fn monte_carlo(
             let (mesh_index, spawn_sub_mesh, mu, chi) = spawn_neutron(&variables, &delta_x);
 
             let particle_exists: bool = true;
+            let this_particle: bool = false;
+            let this_particle1: bool = false;
 
             let start_x: f64 = meshid[mesh_index].mesh_left + spawn_sub_mesh;
 
-            tally = particle_lifetime(
+            (tally, count, count1) = particle_lifetime(
+                this_particle,
+                this_particle1,
                 _y,
+                count,
+                count1,
                 particle_exists,
                 start_x,
                 mu,
@@ -643,6 +689,7 @@ fn monte_carlo(
 
         // println!("k is {}", k);
     }
+    println!("{count} = {count1}");
     results
 }
 
