@@ -255,12 +255,9 @@ fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
         .map(|x| x.parse::<u8>().unwrap())
         .collect();
     (
-        variables,
-        xsdata,
-        matid,
-        deltax,
-        hash.get("solution").unwrap().trim().parse().unwrap(),
-        // 1,
+        variables, xsdata, matid, deltax,
+        // hash.get("solution").unwrap().trim().parse().unwrap(),
+        1,
     )
 }
 
@@ -339,7 +336,8 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, f64, u
             return (
                 ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
                     + variables.mpwr / 2
-                    + temp2_int.unwrap().parse::<usize>().unwrap(),
+                    + temp2_int.unwrap().parse::<usize>().unwrap()
+                    - 1,
                 ("0.".to_string() + temp2_dec.unwrap())
                     .parse::<f64>()
                     .unwrap(),
@@ -351,7 +349,8 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, f64, u
             return (
                 ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
                     + variables.mpwr / 2
-                    + temp2_int.unwrap().parse::<usize>().unwrap(),
+                    + temp2_int.unwrap().parse::<usize>().unwrap()
+                    - 1,
                 ("0.".to_string() + temp2_dec.unwrap())
                     .parse::<f64>()
                     .unwrap(),
@@ -419,6 +418,7 @@ fn interaction(xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
 }
 
 fn particle_travel(
+    y: usize,
     mut same_material: bool,
     mut start_x: f64,
     mut mu: f64,
@@ -434,6 +434,9 @@ fn particle_travel(
 ) -> (bool, usize, Tally) {
     while same_material == true {
         let end_x = start_x + delta_s;
+        if chi == 1 {
+            println!("thermal");
+        };
         let mesh_end = if mu >= 0.0 {
             meshid[mesh_index].mesh_right
         } else {
@@ -490,6 +493,10 @@ fn particle_travel(
                 chi,
             );
 
+            if chi == 1 {
+                println!("thermal");
+            }
+
             let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
             let (particle_exists, _chi, _mu) = interaction(&xsdata, xs_index, chi);
             if particle_exists == false {
@@ -498,7 +505,7 @@ fn particle_travel(
             chi = _chi;
             mu = _mu;
             delta_s = mu
-                * thread_rng().gen::<f64>().ln()
+                * -thread_rng().gen::<f64>().ln()
                 * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
         }
     }
@@ -506,6 +513,7 @@ fn particle_travel(
 }
 
 fn particle_lifetime(
+    y: usize,
     mut particle_exists: bool,
     start_x: f64,
     mu: f64,
@@ -524,6 +532,7 @@ fn particle_lifetime(
         let same_material: bool = true;
 
         (particle_exists, mesh_index, tally) = particle_travel(
+            y,
             same_material,
             start_x,
             mu,
@@ -573,6 +582,7 @@ fn monte_carlo(
             let start_x: f64 = meshid[mesh_index].mesh_left + spawn_sub_mesh;
 
             tally = particle_lifetime(
+                _y,
                 particle_exists,
                 start_x,
                 mu,
