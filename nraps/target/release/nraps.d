@@ -1,1 +1,1 @@
-/home/dylan/GitHub/NRAPS/nraps/target/release/nraps: /home/dylan/GitHub/NRAPS/nraps/src/main.rs
+C:\Users\jursk\OneDrive\Documents\GitHub\NRAPS\nraps\target\release\nraps.exe: C:\Users\jursk\OneDrive\Documents\GitHub\NRAPS\nraps\src\main.rs
