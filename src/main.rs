@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
 use std::iter::repeat;
+use std::process::Command;
 // For Multithreading
 // use std::thread;
 // Use these for timing
@@ -643,6 +644,8 @@ fn plot_solution(results: SoltuionResults) -> Result<(), Box<dyn Error>> {
     wtr.write_record(&output_flux1)?;
     wtr.write_record(&output_fission)?;
     wtr.flush()?;
+
+    Command::new("python").arg("plot.py").spawn()?;
 
     Ok(())
 }
