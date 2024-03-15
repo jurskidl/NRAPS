@@ -137,7 +137,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
 }
 
 fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
-    let file = File::open("../SampleInputFile.txt").expect("Unable to read the file");
+    let file = File::open("./SampleInputFile.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
     let end: usize = mapped_file.len();
@@ -337,13 +337,13 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, f64, u
                 ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
                     + variables.mpwr / 2
                     + temp2_int.unwrap().parse::<usize>().unwrap()
-                    - 1,
+                    - 1, // I think I need to subtract one since vectors index @0
                 ("0.".to_string() + temp2_dec.unwrap())
                     .parse::<f64>()
                     .unwrap(),
                 2.0 * (thread_rng().gen::<f64>()) - 1.0,
                 chi,
-            )
+            );
         }
         _ => {
             return (
@@ -362,6 +362,7 @@ fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, f64, u
 }
 
 fn tally_calc(
+    y: usize,
     tally0: f64,
     tally1: f64,
     mesh_end: f64,
@@ -400,7 +401,7 @@ fn cross_mesh(
     (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
-fn interaction(xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
+fn interaction(y: usize, xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
     let interaction: f64 = thread_rng().gen();
     let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = absorption + xsdata.sigf[xs_index] * xsdata.inv_sigtr[xs_index];
@@ -418,19 +419,24 @@ fn interaction(xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
 }
 
 fn particle_travel(
-    mut same_material: bool,
-    mut start_x: f64,
-    mut mu: f64,
-    mut chi: u8,
-    mut mesh_index: usize,
+    y: usize,
     mut tally: Tally,
-    mut delta_s: f64,
     meshid: &Vec<Mesh>,
-    boundl: f64,
-    boundr: f64,
+    mut mesh_index: usize,
+    mut chi: u8,
+    mut mu: f64,
+    mut start_x: f64,
     mattypes: u8,
+    boundr: f64,
+    boundl: f64,
     xsdata: &XSData,
-) -> (bool, usize, Tally) {
+) -> (bool, Tally) {
+    // determine particle travel length
+    let s: f64 = -thread_rng().gen::<f64>().ln()
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
+    let mut delta_s: f64 = mu * s;
+
+    let mut same_material = true;
     while same_material == true {
         let end_x = start_x + delta_s;
         let mesh_end = if mu >= 0.0 {
@@ -445,6 +451,7 @@ fn particle_travel(
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
             ) = tally_calc(
+                y,
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
                 mesh_end,
@@ -460,6 +467,7 @@ fn particle_travel(
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
             ) = tally_calc(
+                y,
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
                 mesh_end,
@@ -481,6 +489,7 @@ fn particle_travel(
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
             ) = tally_calc(
+                y,
                 tally.tally_length0[mesh_index],
                 tally.tally_length1[mesh_index],
                 end_x,
@@ -490,9 +499,9 @@ fn particle_travel(
             );
 
             let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
-            let (particle_exists, _chi, _mu) = interaction(&xsdata, xs_index, chi);
+            let (particle_exists, _chi, _mu) = interaction(y, &xsdata, xs_index, chi);
             if particle_exists == false {
-                return (particle_exists, mesh_index, tally);
+                return (particle_exists, tally);
             }
             chi = _chi;
             mu = _mu;
@@ -501,45 +510,36 @@ fn particle_travel(
                 * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
         }
     }
-    (true, mesh_index, tally)
+    (true, tally)
 }
 
 fn particle_lifetime(
     y: usize,
-    mut particle_exists: bool,
-    start_x: f64,
-    mu: f64,
-    chi: u8,
-    mut mesh_index: usize,
     mut tally: Tally,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
     variables: &Variables,
+    delta_x: &DeltaX,
 ) -> Tally {
+    // spawn_sub_mesh is the partial distance through the mesh
+    let (mesh_index, spawn_sub_mesh, mu, chi) = spawn_neutron(&variables, &delta_x);
+    let start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
+
+    let mut particle_exists = true;
     while particle_exists == true {
-        let s: f64 = -thread_rng().gen::<f64>().ln()
-            * xsdata.inv_sigtr[(meshid[mesh_index].matid + variables.mattypes * (chi)) as usize];
-        let delta_s: f64 = mu * s;
-
-        let same_material: bool = true;
-
-        (particle_exists, mesh_index, tally) = particle_travel(
-            same_material,
-            start_x,
-            mu,
-            chi,
-            mesh_index,
+        (particle_exists, tally) = particle_travel(
+            y,
             tally,
-            delta_s,
             meshid,
-            variables.boundl,
-            variables.boundr,
+            mesh_index,
+            chi,
+            mu,
+            start_x,
             variables.mattypes,
+            variables.boundr,
+            variables.boundl,
             xsdata,
         );
-        if particle_exists == false {
-            println!("particle ended")
-        }
     }
     return tally;
 }
@@ -568,25 +568,7 @@ fn monte_carlo(
         k_new = 0.0;
         // println!("Starting Generation {x}");
         for _y in 0..variables.histories {
-            // spawn_sub_mesh is the partial distance through the mesh
-            let (mesh_index, spawn_sub_mesh, mu, chi) = spawn_neutron(&variables, &delta_x);
-
-            let particle_exists: bool = true;
-
-            let start_x: f64 = meshid[mesh_index].mesh_left + spawn_sub_mesh;
-
-            tally = particle_lifetime(
-                _y,
-                particle_exists,
-                start_x,
-                mu,
-                chi,
-                mesh_index,
-                tally,
-                xsdata,
-                meshid,
-                variables,
-            )
+            tally = particle_lifetime(_y, tally, xsdata, meshid, variables, delta_x)
         }
 
         let ((flux0, flux1), fission_source): ((Vec<f64>, Vec<f64>), Vec<f64>) =
@@ -650,12 +632,12 @@ fn plot_solution(results: SoltuionResults) -> Result<(), Box<dyn Error>> {
         .map(|x| x.to_string())
         .collect();
 
-    let mut wtr_k = Writer::from_path("../k_eff.csv")?;
+    let mut wtr_k = Writer::from_path("./k_eff.csv")?;
 
     wtr_k.write_record(&output_k)?;
     wtr_k.flush()?;
 
-    let mut wtr = Writer::from_path("../interface.csv")?;
+    let mut wtr = Writer::from_path("./interface.csv")?;
 
     wtr.write_record(&output_flux0)?;
     wtr.write_record(&output_flux1)?;
