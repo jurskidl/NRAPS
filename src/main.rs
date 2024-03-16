@@ -64,14 +64,8 @@ struct Mesh {
     mesh_right: f64,
 }
 
-struct Tally {
-    tally_length0: Vec<f64>,
-    tally_length1: Vec<f64>,
-}
-
 struct SoltuionResults {
-    flux0: Vec<f64>,
-    flux1: Vec<f64>,
+    flux: Vec<Vec<f64>>,
     fission_source: Vec<f64>,
     k: Vec<f64>,
 }
@@ -331,15 +325,15 @@ fn spawn_neutron(
     variables: &Variables,
     delta_x: &DeltaX,
 ) -> (usize, f64, f64, u8) {
-    let temp_energy: f64 = thread_rng().gen();
-    let chi = if temp_energy >= 0.7 { 0 } else { 1 };
+    let chi: f64 = thread_rng().gen();
+    let neutron_energy = if chi >= 0.7 { 0 } else { 1 };
     match variables.energygroups {
         4 => {
             return (
                 fuel_indices[thread_rng().gen_range(0..fuel_indices.len())],
                 thread_rng().gen(),
                 2.0 * (thread_rng().gen::<f64>()) - 1.0,
-                chi,
+                neutron_energy,
             );
         }
         _ => {
@@ -350,22 +344,6 @@ fn spawn_neutron(
                 0,
             )
         }
-    }
-}
-
-fn tally_calc(
-    y: usize,
-    tally0: f64,
-    tally1: f64,
-    mesh_end: f64,
-    start_x: f64,
-    mu: f64,
-    chi: u8,
-) -> (f64, f64) {
-    match chi {
-        0 => return (tally0 + ((start_x - mesh_end) / mu).abs(), tally1),
-        1 => return (tally0, tally1 + ((start_x - mesh_end) / mu).abs()),
-        _ => (tally0, tally1),
     }
 }
 
@@ -393,39 +371,47 @@ fn cross_mesh(
     (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
-fn interaction(y: usize, xsdata: &XSData, xs_index: usize, chi: u8) -> (bool, u8, f64) {
+fn interaction(y: usize, xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
     let interaction: f64 = thread_rng().gen();
     let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = absorption + xsdata.sigf[xs_index] * xsdata.inv_sigtr[xs_index];
     let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
     if interaction < absorption {
-        return (false, chi, 0.0);
+        return (false, neutron_energy, 0.0);
     } else if interaction < fission {
-        return (false, chi, 0.0);
+        return (false, neutron_energy, 0.0);
     } else if interaction < in_scatter {
-        return (true, chi, 2.0 * (thread_rng().gen::<f64>()) - 1.0);
+        return (
+            true,
+            neutron_energy,
+            2.0 * (thread_rng().gen::<f64>()) - 1.0,
+        );
     } else {
         //down scatter
-        return (true, chi + 1, 2.0 * (thread_rng().gen::<f64>()) - 1.0);
+        return (
+            true,
+            neutron_energy + 1,
+            2.0 * (thread_rng().gen::<f64>()) - 1.0,
+        );
     }
 }
 
 fn particle_travel(
     y: usize,
-    mut tally: Tally,
+    mut tally: Vec<Vec<f64>>,
     meshid: &Vec<Mesh>,
     mut mesh_index: usize,
-    mut chi: u8,
+    mut neutron_energy: u8,
     mut mu: f64,
     mut start_x: f64,
     mattypes: u8,
     boundr: f64,
     boundl: f64,
     xsdata: &XSData,
-) -> (bool, Tally, usize, f64, u8) {
+) -> (bool, Vec<Vec<f64>>, usize, f64, u8) {
     // determine particle travel length
     let s: f64 = -thread_rng().gen::<f64>().ln()
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (neutron_energy)) as usize];
     let mut delta_s: f64 = mu * s;
 
     let mut same_material = true;
@@ -437,36 +423,16 @@ fn particle_travel(
             meshid[mesh_index].mesh_left
         };
 
-        if mu * (end_x - mesh_end) > 0.0 && (mesh_index == 0 || mesh_index == meshid.len() - 1) {
+        if (mu < 0.0 && end_x < mesh_end && mesh_index == 0)
+            || (mu >= 0.0 && end_x > mesh_end && mesh_index == meshid.len() - 1)
+        {
             // hit the boundary
-            (
-                tally.tally_length0[mesh_index],
-                tally.tally_length1[mesh_index],
-            ) = tally_calc(
-                y,
-                tally.tally_length0[mesh_index],
-                tally.tally_length1[mesh_index],
-                mesh_end,
-                start_x,
-                mu,
-                chi,
-            );
+            tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
             let bound = if mu >= 0.0 { boundr } else { boundl };
             (mu, delta_s, start_x) = hit_boundary(mu, start_x, delta_s, bound, mesh_end);
         } else if mu * (end_x - mesh_end) > 0.0 {
             // cross mesh boundary
-            (
-                tally.tally_length0[mesh_index],
-                tally.tally_length1[mesh_index],
-            ) = tally_calc(
-                y,
-                tally.tally_length0[mesh_index],
-                tally.tally_length1[mesh_index],
-                mesh_end,
-                start_x,
-                mu,
-                chi,
-            );
+            tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
 
             let prev_mat = meshid[mesh_index].matid;
 
@@ -477,58 +443,49 @@ fn particle_travel(
             }
         } else {
             // interaction
-            (
-                tally.tally_length0[mesh_index],
-                tally.tally_length1[mesh_index],
-            ) = tally_calc(
-                y,
-                tally.tally_length0[mesh_index],
-                tally.tally_length1[mesh_index],
-                end_x,
-                start_x,
-                mu,
-                chi,
-            );
+            tally[neutron_energy as usize][mesh_index] += ((start_x - end_x) / mu).abs();
 
-            let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
-            let (particle_exists, _chi, _mu) = interaction(y, &xsdata, xs_index, chi);
+            let xs_index: usize = (meshid[mesh_index].matid + mattypes * (neutron_energy)) as usize;
+            let (particle_exists, _neutron_energy, _mu) =
+                interaction(y, &xsdata, xs_index, neutron_energy);
             if particle_exists == false {
-                return (particle_exists, tally, mesh_index, mu, chi);
+                return (particle_exists, tally, mesh_index, mu, neutron_energy);
             }
-            chi = _chi;
+            neutron_energy = _neutron_energy;
             mu = _mu;
             delta_s = mu
                 * -thread_rng().gen::<f64>().ln()
-                * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
+                * xsdata.inv_sigtr
+                    [(meshid[mesh_index].matid + mattypes * (neutron_energy)) as usize];
         }
     }
-    (true, tally, mesh_index, mu, chi)
+    (true, tally, mesh_index, mu, neutron_energy)
 }
 
 fn particle_lifetime(
     y: usize,
-    mut tally: Tally,
+    mut tally: Vec<Vec<f64>>,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
     fuel_indices: &Vec<usize>,
     variables: &Variables,
     delta_x: &DeltaX,
     mut spawns: Vec<usize>,
-) -> (Tally, Vec<usize>) {
+) -> (Vec<Vec<f64>>, Vec<usize>) {
     // spawn_sub_mesh is the partial distance through the mesh
-    let (mut mesh_index, spawn_sub_mesh, mut mu, mut chi) =
+    let (mut mesh_index, spawn_sub_mesh, mut mu, mut neutron_energy) =
         spawn_neutron(fuel_indices, &variables, &delta_x);
     let start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
     spawns[mesh_index] += 1;
 
     let mut particle_exists: bool = true;
     while particle_exists == true {
-        (particle_exists, tally, mesh_index, mu, chi) = particle_travel(
+        (particle_exists, tally, mesh_index, mu, neutron_energy) = particle_travel(
             y,
             tally,
             meshid,
             mesh_index,
-            chi,
+            neutron_energy,
             mu,
             start_x,
             variables.mattypes,
@@ -550,17 +507,14 @@ fn monte_carlo(
 ) -> SoltuionResults {
     // println!("running monte carlo code");
     let mut results = SoltuionResults {
-        flux0: vec![0.0; meshid.len()],
-        flux1: vec![0.0; meshid.len()],
+        flux: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
         fission_source: vec![0.0; meshid.len()],
         k: vec![0.0; variables.generations],
     };
 
     for x in 0..variables.generations {
-        let mut tally = Tally {
-            tally_length0: vec![0.0; meshid.len()],
-            tally_length1: vec![0.0; meshid.len()],
-        };
+        let mut tally: Vec<Vec<f64>> =
+            vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
         let k = k_new;
         k_new = 0.0;
         // println!("Starting Generation {x}");
@@ -579,29 +533,17 @@ fn monte_carlo(
             )
         }
 
-        let ((flux0, flux1), fission_source): ((Vec<f64>, Vec<f64>), Vec<f64>) =
-            (0..tally.tally_length0.len())
-                .into_iter()
-                .map(|x| {
-                    let delta_x = meshid[x].delta_x;
-                    let matid = meshid[x].matid;
-                    let flux0 = tally.tally_length0[x] / (k * variables.histories as f64 * delta_x);
-                    let fission_source0 =
-                        xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux0;
-                    let flux1 = tally.tally_length1[x] / (k * variables.histories as f64 * delta_x);
-                    let fission_source1 = xsdata.nut[(matid + variables.mattypes) as usize]
-                        * xsdata.sigf[(matid + variables.mattypes) as usize]
-                        * flux1;
-                    let fission_source = fission_source1 + fission_source0;
-                    k_new += k * delta_x * fission_source;
-                    return ((flux0, flux1), fission_source);
-                })
-                .unzip();
-
-        for index in 0..meshid.len() {
-            results.flux0[index] += flux0[index];
-            results.flux1[index] += flux1[index];
-            results.fission_source[index] += fission_source[index];
+        for energy in 0..variables.energygroups as usize {
+            for index in 0..tally[energy].len() {
+                let delta_x = meshid[index].delta_x;
+                let matid = meshid[index].matid;
+                let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
+                let fission_source =
+                    xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux;
+                results.flux[energy][index] += flux;
+                results.fission_source[index] += fission_source;
+                k_new += k * delta_x * fission_source
+            }
         }
 
         results.k[x] = k;
@@ -630,10 +572,15 @@ fn monte_carlo(
     results
 }
 
-fn plot_solution(results: SoltuionResults) -> Result<(), Box<dyn Error>> {
+fn plot_solution(results: SoltuionResults, energygroups: u8) -> Result<(), Box<dyn Error>> {
     let output_k: Vec<String> = results.k.iter().map(|x| x.to_string()).collect();
-    let output_flux0: Vec<String> = results.flux0.iter().map(|x| x.to_string()).collect();
-    let output_flux1: Vec<String> = results.flux1.iter().map(|x| x.to_string()).collect();
+    let mut output_flux =
+        vec![vec!["0.0".to_string(); results.fission_source.len()]; energygroups as usize];
+    for energy in 0..energygroups as usize {
+        for index in 0..results.fission_source.len() {
+            output_flux[energy][index] = results.flux[energy][index].to_string();
+        }
+    }
     let output_fission: Vec<String> = results
         .fission_source
         .iter()
@@ -647,8 +594,9 @@ fn plot_solution(results: SoltuionResults) -> Result<(), Box<dyn Error>> {
 
     let mut wtr = Writer::from_path("./interface.csv")?;
 
-    wtr.write_record(&output_flux0)?;
-    wtr.write_record(&output_flux1)?;
+    for energy in 0..energygroups as usize {
+        wtr.write_record(&output_flux[energy])?;
+    }
     wtr.write_record(&output_fission)?;
     wtr.flush()?;
 
@@ -666,14 +614,13 @@ fn main() {
     let results = match solution {
         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, fuel_indices, 1.0),
         _ => SoltuionResults {
-            flux0: Vec::new(),
-            flux1: Vec::new(),
+            flux: Vec::new(),
             fission_source: Vec::new(),
             k: Vec::new(),
         }, // not implemented
     };
 
-    let _ = plot_solution(results);
+    let _ = plot_solution(results, variables.energygroups);
 
     // below is for timing
     // let mut now = SystemTime::now();
