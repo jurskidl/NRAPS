@@ -262,7 +262,7 @@ fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
     )
 }
 
-fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh> {
+fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh>, Vec<usize>) {
     let mut temp: Vec<u8> = matid
         .into_iter()
         .flat_map(|x| {
@@ -291,6 +291,13 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh>
     temp.drain(0..(variables.mpwr / 2));
     temp.truncate(temp.len() - (variables.mpwr / 2));
 
+    let fuel_indices: Vec<usize> = temp
+        .iter()
+        .enumerate()
+        .filter(|(_, &r)| r == 0 || r == 1)
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+
     let mut mesh: Vec<Mesh> = Vec::with_capacity(temp.len());
 
     let mut mesh_left: f64 = 0.0;
@@ -316,45 +323,29 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> Vec<Mesh>
         }
     }
 
-    mesh
+    (mesh, fuel_indices)
 }
 
-fn spawn_neutron(variables: &Variables, delta_x: &DeltaX) -> (usize, f64, f64, u8) {
-    let spawn_string: String = thread_rng()
-        .gen_range(1.0..(variables.numass * variables.numrods) as f64)
-        .to_string();
-    let (temp_int, temp_dec) = spawn_string.split_once(".").unzip();
-    let temp2 = (("0.".to_string() + temp_dec.unwrap())
-        .parse::<f64>()
-        .unwrap()
-        / delta_x.fuel)
-        .to_string();
-    let (temp2_int, temp2_dec) = temp2.split_once(".").unzip();
+fn spawn_neutron(
+    fuel_indices: &Vec<usize>,
+    variables: &Variables,
+    delta_x: &DeltaX,
+) -> (usize, f64, f64, u8) {
     let temp_energy: f64 = thread_rng().gen();
     let chi = if temp_energy >= 0.7 { 0 } else { 1 };
     match variables.energygroups {
         4 => {
             return (
-                ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
-                    + variables.mpwr / 2
-                    + temp2_int.unwrap().parse::<usize>().unwrap()
-                    - 1, // I think I need to subtract one since vectors index @0
-                ("0.".to_string() + temp2_dec.unwrap())
-                    .parse::<f64>()
-                    .unwrap(),
+                fuel_indices[thread_rng().gen_range(0..fuel_indices.len())],
+                thread_rng().gen(),
                 2.0 * (thread_rng().gen::<f64>()) - 1.0,
                 chi,
             );
         }
         _ => {
             return (
-                ((variables.mpfr + variables.mpwr) * temp_int.unwrap().parse::<usize>().unwrap())
-                    + variables.mpwr / 2
-                    + temp2_int.unwrap().parse::<usize>().unwrap()
-                    - 1,
-                ("0.".to_string() + temp2_dec.unwrap())
-                    .parse::<f64>()
-                    .unwrap(),
+                fuel_indices[thread_rng().gen_range(0..fuel_indices.len())],
+                thread_rng().gen(),
                 2.0 * (thread_rng().gen::<f64>()) - 1.0,
                 0,
             )
@@ -431,7 +422,7 @@ fn particle_travel(
     boundr: f64,
     boundl: f64,
     xsdata: &XSData,
-) -> (bool, Tally) {
+) -> (bool, Tally, usize, f64, u8) {
     // determine particle travel length
     let s: f64 = -thread_rng().gen::<f64>().ln()
         * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
@@ -446,7 +437,7 @@ fn particle_travel(
             meshid[mesh_index].mesh_left
         };
 
-        if mu * (end_x - mesh_end) >= 0.0 && (mesh_index == 0 || mesh_index == meshid.len() - 1) {
+        if mu * (end_x - mesh_end) > 0.0 && (mesh_index == 0 || mesh_index == meshid.len() - 1) {
             // hit the boundary
             (
                 tally.tally_length0[mesh_index],
@@ -462,7 +453,7 @@ fn particle_travel(
             );
             let bound = if mu >= 0.0 { boundr } else { boundl };
             (mu, delta_s, start_x) = hit_boundary(mu, start_x, delta_s, bound, mesh_end);
-        } else if mu * (end_x - mesh_end) >= 0.0 {
+        } else if mu * (end_x - mesh_end) > 0.0 {
             // cross mesh boundary
             (
                 tally.tally_length0[mesh_index],
@@ -502,7 +493,7 @@ fn particle_travel(
             let xs_index: usize = (meshid[mesh_index].matid + mattypes * (chi)) as usize;
             let (particle_exists, _chi, _mu) = interaction(y, &xsdata, xs_index, chi);
             if particle_exists == false {
-                return (particle_exists, tally);
+                return (particle_exists, tally, mesh_index, mu, chi);
             }
             chi = _chi;
             mu = _mu;
@@ -511,7 +502,7 @@ fn particle_travel(
                 * xsdata.inv_sigtr[(meshid[mesh_index].matid + mattypes * (chi)) as usize];
         }
     }
-    (true, tally)
+    (true, tally, mesh_index, mu, chi)
 }
 
 fn particle_lifetime(
@@ -519,16 +510,20 @@ fn particle_lifetime(
     mut tally: Tally,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
+    fuel_indices: &Vec<usize>,
     variables: &Variables,
     delta_x: &DeltaX,
-) -> Tally {
+    mut spawns: Vec<usize>,
+) -> (Tally, Vec<usize>) {
     // spawn_sub_mesh is the partial distance through the mesh
-    let (mesh_index, spawn_sub_mesh, mu, chi) = spawn_neutron(&variables, &delta_x);
+    let (mut mesh_index, spawn_sub_mesh, mut mu, mut chi) =
+        spawn_neutron(fuel_indices, &variables, &delta_x);
     let start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
+    spawns[mesh_index] += 1;
 
-    let mut particle_exists = true;
+    let mut particle_exists: bool = true;
     while particle_exists == true {
-        (particle_exists, tally) = particle_travel(
+        (particle_exists, tally, mesh_index, mu, chi) = particle_travel(
             y,
             tally,
             meshid,
@@ -542,7 +537,7 @@ fn particle_lifetime(
             xsdata,
         );
     }
-    return tally;
+    return (tally, spawns);
 }
 
 fn monte_carlo(
@@ -550,6 +545,7 @@ fn monte_carlo(
     xsdata: &XSData,
     delta_x: &DeltaX,
     meshid: &Vec<Mesh>,
+    fuel_indices: Vec<usize>,
     mut k_new: f64,
 ) -> SoltuionResults {
     // println!("running monte carlo code");
@@ -568,8 +564,19 @@ fn monte_carlo(
         let k = k_new;
         k_new = 0.0;
         // println!("Starting Generation {x}");
+
+        let mut spawns: Vec<usize> = vec![0; meshid.len()];
         for _y in 0..variables.histories {
-            tally = particle_lifetime(_y, tally, xsdata, meshid, variables, delta_x)
+            (tally, spawns) = particle_lifetime(
+                _y,
+                tally,
+                xsdata,
+                meshid,
+                &fuel_indices,
+                variables,
+                delta_x,
+                spawns,
+            )
         }
 
         let ((flux0, flux1), fission_source): ((Vec<f64>, Vec<f64>), Vec<f64>) =
@@ -654,10 +661,10 @@ fn main() {
     let (variables, xsdata, matid, deltax, solution) = process_input();
 
     // index meshid via [assembly# * rod#]
-    let meshid = mesh_gen(matid, &variables, &deltax);
+    let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
     let results = match solution {
-        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, 1.0),
+        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, fuel_indices, 1.0),
         _ => SoltuionResults {
             flux0: Vec::new(),
             flux1: Vec::new(),

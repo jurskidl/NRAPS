@@ -18,9 +18,6 @@ for line in open('interface.csv', 'r'):
 
     count += 1
 
-print(flux0[10])
-print(flux1[10])
-
 plt.plot(k_eff, label='multplication factor')
 plt.title('Multiplication Factor')
 # plt.show()
