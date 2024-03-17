@@ -383,7 +383,7 @@ fn cross_mesh(
     (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
-fn interaction(y: usize, xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
+fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
     let interaction: f64 = thread_rng().gen();
     let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = absorption + xsdata.sigf[xs_index] * xsdata.inv_sigtr[xs_index];
@@ -409,7 +409,6 @@ fn interaction(y: usize, xsdata: &XSData, xs_index: usize, neutron_energy: u8) -
 }
 
 fn particle_travel(
-    y: usize,
     mut tally: Vec<Vec<f64>>,
     meshid: &Vec<Mesh>,
     mut mesh_index: usize,
@@ -461,7 +460,7 @@ fn particle_travel(
 
             let xs_index: usize = (meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize;
             let (particle_exists, _neutron_energy, _mu) =
-                interaction(y, &xsdata, xs_index, neutron_energy);
+                interaction(&xsdata, xs_index, neutron_energy);
             if particle_exists == false {
                 return (
                     particle_exists,
@@ -472,6 +471,7 @@ fn particle_travel(
                     start_x,
                 );
             }
+            start_x = end_x;
             neutron_energy = _neutron_energy;
             mu = _mu;
             delta_s = mu
@@ -484,7 +484,6 @@ fn particle_travel(
 }
 
 fn particle_lifetime(
-    y: usize,
     mut tally: Vec<Vec<f64>>,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
@@ -507,7 +506,6 @@ fn particle_lifetime(
             neutron_energy,
             start_x,
         ) = particle_travel(
-            y,
             tally,
             meshid,
             mesh_index,
@@ -543,20 +541,25 @@ fn monte_carlo(
             vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
         let k = k_new;
         k_new = 0.0;
-        // println!("Starting Generation {x}");
 
         for _y in 0..variables.histories {
-            tally = particle_lifetime(_y, tally, xsdata, meshid, &fuel_indices, variables, delta_x)
+            tally = particle_lifetime(tally, xsdata, meshid, &fuel_indices, variables, delta_x)
         }
 
         for energy in 0..variables.energygroups as usize {
             for index in 0..tally[energy].len() {
                 let delta_x = meshid[index].delta_x;
                 let matid = meshid[index].matid;
+                let power_level = 3565e6; // J/s
+                let energy_fission = 200e6 * 1.602176634e-19; // J
+
+                // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
+                let core_volume = 365.76 * 80891.3952;
+                let conversion = power_level / (energy_fission * core_volume);
                 let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
                 let fission_source =
                     xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux;
-                results.flux[energy][index] += flux;
+                results.flux[energy][index] += flux * conversion;
                 results.fission_source[index] += fission_source;
                 k_new += k * delta_x * fission_source
             }
@@ -588,7 +591,13 @@ fn monte_carlo(
     results
 }
 
-fn plot_solution(results: SoltuionResults, energygroups: u8) -> Result<(), Box<dyn Error>> {
+fn plot_solution(
+    results: SoltuionResults,
+    energygroups: u8,
+    generations: usize,
+    number_meshes: usize,
+    assembly_length: f64,
+) -> Result<(), Box<dyn Error>> {
     let output_k: Vec<String> = results.k.iter().map(|x| x.to_string()).collect();
     let mut output_flux =
         vec![vec!["0.0".to_string(); results.fission_source.len()]; energygroups as usize];
@@ -602,6 +611,13 @@ fn plot_solution(results: SoltuionResults, energygroups: u8) -> Result<(), Box<d
         .iter()
         .map(|x| x.to_string())
         .collect();
+
+    let mut wtr_vars = Writer::from_path("./vars.csv")?;
+
+    wtr_vars.write_record([&assembly_length.to_string()])?;
+    wtr_vars.write_record([&number_meshes.to_string()])?;
+    wtr_vars.write_record([&generations.to_string()])?;
+    wtr_vars.flush()?;
 
     let mut wtr_k = Writer::from_path("./k_eff.csv")?;
 
@@ -635,7 +651,13 @@ fn main() {
         }, // not implemented
     };
 
-    let _ = plot_solution(results, variables.energygroups);
+    let _ = plot_solution(
+        results,
+        variables.energygroups,
+        variables.generations,
+        meshid.len(),
+        meshid[meshid.len() - 1].mesh_right,
+    );
 
     // below is for timing
     // let mut now = SystemTime::now();
