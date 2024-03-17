@@ -624,16 +624,16 @@ fn monte_carlo(
             for index in 0..tally[energy].len() {
                 let delta_x = meshid[index].delta_x;
                 let matid = meshid[index].matid;
-                let power_level = 3565e6; // J/s
-                let energy_fission = 200e6 * 1.602176634e-19; // J
+                // let power_level = 3565e6; // J/s
+                // let energy_fission = 200e6 * 1.602176634e-19; // J
 
                 // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-                let core_volume = 365.76 * 80891.3952;
-                let conversion = power_level / (energy_fission * core_volume);
+                // let core_volume = 365.76 * 80891.3952;
+                // let conversion = power_level / (energy_fission * core_volume);
                 let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
                 let fission_source =
                     xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux;
-                results.flux[energy][index] += flux * conversion;
+                results.flux[energy][index] += flux; //* conversion;
                 results.fission_source[index] += fission_source;
                 k_new += k * delta_x * fission_source
             }
@@ -695,41 +695,41 @@ fn main() {
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    // let results = match solution {
-    //     1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-    //     _ => SoltuionResults {
-    //         flux: Vec::new(),
-    //         fission_source: Vec::new(),
-    //         k: Vec::new(),
-    //     }, // not implemented
-    // };
+    let results = match solution {
+        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+        _ => SoltuionResults {
+            flux: Vec::new(),
+            fission_source: Vec::new(),
+            k: Vec::new(),
+        }, // not implemented
+    };
 
-    // let _ = plot_solution(
-    //     results,
-    //     variables.energygroups,
-    //     variables.generations,
-    //     meshid.len(),
-    //     meshid[meshid.len() - 1].mesh_right,
-    // );
+    let _ = plot_solution(
+        results,
+        variables.energygroups,
+        variables.generations,
+        meshid.len(),
+        meshid[meshid.len() - 1].mesh_right,
+    );
 
     // below is for timing
-    let mut now = SystemTime::now();
+    // let mut now = SystemTime::now();
 
-    for zyn in 0..100 {
-        if zyn % 10 == 0 {
-            print!(
-                "Average time over those 10000 runs was {} seconds \n",
-                now.elapsed().unwrap().as_secs() / 10
-            );
-            now = SystemTime::now();
-        }
-        let results = match solution {
-            1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-            _ => SoltuionResults {
-                flux: Vec::new(),
-                fission_source: Vec::new(),
-                k: Vec::new(),
-            }, // not implemented
-        };
-    }
+    // for zyn in 0..100 {
+    //     if zyn % 10 == 0 {
+    //         print!(
+    //             "Average time over those 10000 runs was {} seconds \n",
+    //             now.elapsed().unwrap().as_secs() / 10
+    //         );
+    //         now = SystemTime::now();
+    //     }
+    //     let results = match solution {
+    //         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+    //         _ => SoltuionResults {
+    //             flux: Vec::new(),
+    //             fission_source: Vec::new(),
+    //             k: Vec::new(),
+    //         }, // not implemented
+    //     };
+    // }
 }
