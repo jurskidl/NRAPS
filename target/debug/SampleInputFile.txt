@@ -31,7 +31,7 @@ solver   = 3
 # Generations = The number of generations to be simulated with the Monte Carlo Method.  #
 # Histories   = The number of histories per generation to be simulated with the Monte   #
 #               Carlo method.                                                           #
-Generations = 100
+Generations = 2
 Histories = 1000
 Skip = 1
 
@@ -44,11 +44,11 @@ Skip = 1
 #            however, if you enter an odd number, the code will make it even by adding  #
 #            1 to the value entered.                                                    #
 NumAss   = 2
-NumRods  = 17
-RodDia   = 1.1058
-RodPitch = 1.4385
-MPFR = 7
-MPWR = 4
+NumRods  = 2
+RodDia   = 1.0
+RodPitch = 1.5
+MPFR = 1
+MPWR = 2
 
 # You have to specify the boundary conditions after you set the number of energy groups #
 # BoundL  = Left Boundary Condition                                                     #
@@ -67,12 +67,12 @@ XSData
     #             Energy Group 1                        Energy Group 2                  #
     #        UO2      MOX      H2O      CR         UO2      MOX      H2O      CR        #
     #         0        1        2        3          0        1        2        3        #
-    SigTR = 0.24896  0.24798  0.23823  0.10000    0.88525  1.12071  1.22518  1.10000
-    SigIS = 0.22698  0.22482  0.21904  0.00000    0.68472  0.69359  1.21063  0.10000
-    SigDS = 0.01102  0.00886  0.02776  0.00000    0.00000  0.00000  0.00000  0.00000
-    SigA  = 0.01163  0.01495  0.01598  0.10000    0.11746  0.27116  0.01455  1.00000
-    SigF  = 0.00394  0.00400  0.00000  0.00000    0.08307  0.15596  0.00000  0.00000
-    nuT   = 2.46950  2.84100  0.00000  0.00000    2.46950  2.84100  0.00000  0.00000
+    SigTR = 0.2  0.24798  0.23823  0.10000    1.0  1.12071  1.22518  1.10000
+    SigIS = 0.185  0.22482  0.21904  0.00000    0.8  0.69359  1.21063  0.10000
+    SigDS = 0.015  0.00886  0.02776  0.00000    0.00000  0.00000  0.00000  0.00000
+    SigA  = 0.0  0.01495  0.01598  0.10000    0.2  0.27116  0.01455  1.00000
+    SigF  = 0.0  0.00400  0.00000  0.00000    0.18  0.15596  0.00000  0.00000
+    nuT   = 2.46950  2.84100  0.00000  0.00000    1.4  2.84100  0.00000  0.00000
     ChiT  = 1.00000  1.00000  0.00000  0.00000    0.00000  0.00000  0.00000  0.00000
 
 # Next add the different configurations.                                                #
@@ -81,6 +81,6 @@ ConfigSets
     #      start with 0.  Material id corresponds with the material location above.     #
     #      NOTE: this should be changed to allow for assembly wise input.               #
     #      UO2 = 0, MOX = 1, H2O = 2, CR = 3                                            #
-    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
-    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
+    MatID = 2 0 2 0 2
+    MatID = 2 0 2 0 2
 END

@@ -184,7 +184,8 @@ fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
         numass: hash.get("numass").unwrap().trim().parse().unwrap(),
         numrods: hash.get("numrods").unwrap().trim().parse().unwrap(),
         roddia: hash.get("roddia").unwrap().trim().parse().unwrap(),
-        rodpitch: hash.get("rodpitch").unwrap().trim().parse().unwrap(),
+        rodpitch: (hash.get("rodpitch").unwrap().trim().parse::<f64>().unwrap()
+            - hash.get("roddia").unwrap().trim().parse::<f64>().unwrap()),
         mpfr: hash.get("mpfr").unwrap().trim().parse().unwrap(),
         mpwr: hash.get("mpwr").unwrap().trim().parse().unwrap(),
         boundl: hash.get("boundl").unwrap().trim().parse().unwrap(),
@@ -387,10 +388,10 @@ fn cross_mesh(
 
 fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
     let interaction: f64 = thread_rng().gen();
-    let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
-    let fission: f64 = absorption + xsdata.sigf[xs_index] * xsdata.inv_sigtr[xs_index];
+    let capture: f64 = (xsdata.siga[xs_index] - xsdata.sigf[xs_index]) * xsdata.inv_sigtr[xs_index];
+    let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
-    if interaction < absorption {
+    if interaction < capture {
         return (false, neutron_energy, 0.0);
     } else if interaction < fission {
         return (false, neutron_energy, 0.0);
@@ -631,15 +632,17 @@ fn monte_carlo(
                 // let core_volume = 365.76 * 80891.3952;
                 // let conversion = power_level / (energy_fission * core_volume);
                 let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
-                let fission_source =
-                    xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux;
+                let fission_source = xsdata.nut
+                    [(matid + (variables.mattypes * energy as u8)) as usize]
+                    * xsdata.sigf[(matid + (variables.mattypes * energy as u8)) as usize]
+                    * flux;
                 results.flux[energy][index] += flux; //* conversion;
                 results.fission_source[index] += fission_source;
                 k_new += k * delta_x * fission_source
             }
         }
 
-        results.k[x] = k;
+        results.k[x] = k_new;
     }
     results
 }
