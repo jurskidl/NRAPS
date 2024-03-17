@@ -7,9 +7,9 @@ use std::fs::File;
 use std::iter::repeat;
 use std::process::Command;
 // For Multithreading
-// use std::thread;
+use std::thread;
 // Use these for timing
-// use std::time::SystemTime;
+use std::time::SystemTime;
 
 pub const NUM_VARS: usize = 24;
 pub const EQUALS: u8 = 61;
@@ -526,7 +526,7 @@ fn monte_carlo(
     xsdata: &XSData,
     delta_x: &DeltaX,
     meshid: &Vec<Mesh>,
-    fuel_indices: Vec<usize>,
+    fuel_indices: &Vec<usize>,
     mut k_new: f64,
 ) -> SoltuionResults {
     // println!("running monte carlo code");
@@ -642,35 +642,41 @@ fn main() {
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    let results = match solution {
-        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, fuel_indices, 1.0),
-        _ => SoltuionResults {
-            flux: Vec::new(),
-            fission_source: Vec::new(),
-            k: Vec::new(),
-        }, // not implemented
-    };
+    // let results = match solution {
+    //     1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, fuel_indices, 1.0),
+    //     _ => SoltuionResults {
+    //         flux: Vec::new(),
+    //         fission_source: Vec::new(),
+    //         k: Vec::new(),
+    //     }, // not implemented
+    // };
 
-    let _ = plot_solution(
-        results,
-        variables.energygroups,
-        variables.generations,
-        meshid.len(),
-        meshid[meshid.len() - 1].mesh_right,
-    );
+    // let _ = plot_solution(
+    //     results,
+    //     variables.energygroups,
+    //     variables.generations,
+    //     meshid.len(),
+    //     meshid[meshid.len() - 1].mesh_right,
+    // );
 
     // below is for timing
-    // let mut now = SystemTime::now();
+    let mut now = SystemTime::now();
 
-    // for zyn in 0..1000000 {
-    //     if zyn % 10000 == 0 {
-    //         print!(
-    //             "Average time over those 10000 runs was {} microseconds \n",
-    //             now.elapsed().unwrap().as_micros() / 10000
-    //         );
-    //         now = SystemTime::now();
-    //     }
-    //     let (variables, xsdata, matid) = process_input();
-    //     let meshid = mesh_gen(matid, variables.mpfr, variables.mpwr);
-    // }
+    for zyn in 0..100 {
+        if zyn % 10 == 0 {
+            print!(
+                "Average time over those 10 runs was {} seconds \n",
+                now.elapsed().unwrap().as_secs() / 10
+            );
+            now = SystemTime::now();
+        }
+        let results = match solution {
+            1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+            _ => SoltuionResults {
+                flux: Vec::new(),
+                fission_source: Vec::new(),
+                k: Vec::new(),
+            }, // not implemented
+        };
+    }
 }
