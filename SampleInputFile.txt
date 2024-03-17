@@ -32,7 +32,7 @@ solver   = 3
 # Histories   = The number of histories per generation to be simulated with the Monte   #
 #               Carlo method.                                                           #
 Generations = 100
-Histories = 1000
+Histories = 1000000
 Skip = 1
 
 # NumRods  = Number of unit cells to be used in this problem.  A unit cell includes both#
