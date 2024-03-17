@@ -249,9 +249,11 @@ fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
         .map(|x| x.parse::<u8>().unwrap())
         .collect();
     (
-        variables, xsdata, matid, deltax,
-        // hash.get("solution").unwrap().trim().parse().unwrap(),
-        1,
+        variables,
+        xsdata,
+        matid,
+        deltax,
+        hash.get("solution").unwrap().trim().parse().unwrap(),
     )
 }
 
@@ -484,39 +486,44 @@ fn particle_travel(
 }
 
 fn particle_lifetime(
-    mut tally: Vec<Vec<f64>>,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
     fuel_indices: &Vec<usize>,
     variables: &Variables,
     delta_x: &DeltaX,
+    start: usize,
+    end: usize,
 ) -> Vec<Vec<f64>> {
-    // spawn_sub_mesh is the partial distance through the mesh
-    let (mut mesh_index, spawn_sub_mesh, mut mu, mut neutron_energy) =
-        spawn_neutron(fuel_indices, &variables, &xsdata, &meshid);
-    let mut start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
+    let mut tally: Vec<Vec<f64>> = vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
 
-    let mut particle_exists: bool = true;
-    while particle_exists == true {
-        (
-            particle_exists,
-            tally,
-            mesh_index,
-            mu,
-            neutron_energy,
-            start_x,
-        ) = particle_travel(
-            tally,
-            meshid,
-            mesh_index,
-            neutron_energy,
-            mu,
-            start_x,
-            variables.mattypes,
-            variables.boundr,
-            variables.boundl,
-            xsdata,
-        );
+    for _y in start..=end {
+        // spawn_sub_mesh is the partial distance through the mesh
+        let (mut mesh_index, spawn_sub_mesh, mut mu, mut neutron_energy) =
+            spawn_neutron(fuel_indices, &variables, &xsdata, &meshid);
+        let mut start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
+
+        let mut particle_exists: bool = true;
+        while particle_exists == true {
+            (
+                particle_exists,
+                tally,
+                mesh_index,
+                mu,
+                neutron_energy,
+                start_x,
+            ) = particle_travel(
+                tally,
+                meshid,
+                mesh_index,
+                neutron_energy,
+                mu,
+                start_x,
+                variables.mattypes,
+                variables.boundr,
+                variables.boundl,
+                xsdata,
+            );
+        }
     }
     return tally;
 }
@@ -542,51 +549,97 @@ fn monte_carlo(
         let k = k_new;
         k_new = 0.0;
 
-        for _y in 0..variables.histories {
-            tally = particle_lifetime(tally, xsdata, meshid, &fuel_indices, variables, delta_x)
-        }
+        // For Multithreading
+        // let size: usize = mapped_file.len();
+        // let threads: usize = thread::available_parallelism().unwrap().get();
+        // let chunk_length = size / threads;
+        // let starting_points: Vec<usize> = (0..threads).map(|x| x * chunk_length).collect();
+        // let mut ending_points: Vec<usize> = Vec::from_iter(starting_points[1..threads].iter().cloned());
+        // ending_points.push(size);
+
+        // let mut hash: HashMap<String, String> = HashMap::with_capacity(NUM_VARS);
+        // std::thread::scope(|scope| {
+        //     let mut handles = Vec::with_capacity(threads);
+        //     for thread in 0..threads {
+        //         let start = starting_points[thread];
+        //         let end = ending_points[thread];
+        //         let buffer = &mapped_file;
+        //         let handle = scope.spawn(move || scan_ascii_chunk(start, end, &buffer));
+        //         handles.push(handle);
+        //     }
+
+        //     // Aggregate the results
+        //     for handle in handles {
+        //         let chunk_result = handle.join().unwrap();
+        //         for (key, value) in chunk_result {
+        //             hash.entry(key.trim().to_string())
+        //                 .and_modify(|existing| *existing = existing.to_owned() + " " + &value)
+        //                 .or_insert(value);
+        //         }
+        //     }
+        // });
+
+        // For Multithreading
+        let threads: usize = thread::available_parallelism().unwrap().get();
+        let threaded_histories = variables.histories / threads;
+        let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
+        let mut ending_points: Vec<usize> =
+            Vec::from_iter(starting_points[1..threads].iter().cloned());
+        ending_points.push(variables.histories);
+
+        std::thread::scope(|scope| {
+            let mut tallies = Vec::with_capacity(threads);
+            for thread in 0..threads {
+                let start = starting_points[thread];
+                let end = ending_points[thread];
+                // let buffer = &mapped_file;
+                let tallied: thread::ScopedJoinHandle<'_, Vec<Vec<f64>>> = scope.spawn(move || {
+                    {
+                        particle_lifetime(
+                            xsdata,
+                            meshid,
+                            fuel_indices,
+                            variables,
+                            delta_x,
+                            start,
+                            end,
+                        )
+                    }
+                });
+                tallies.push(tallied);
+            }
+
+            // Aggregate the results
+            for tallied in tallies {
+                let thread_result = tallied.join().unwrap();
+                for energy in 0..variables.energygroups as usize {
+                    for index in 0..thread_result[energy].len() as usize {
+                        tally[energy][index] += thread_result[energy][index]
+                    }
+                }
+            }
+        });
 
         for energy in 0..variables.energygroups as usize {
             for index in 0..tally[energy].len() {
                 let delta_x = meshid[index].delta_x;
                 let matid = meshid[index].matid;
-                let power_level = 3565e6; // J/s
-                let energy_fission = 200e6 * 1.602176634e-19; // J
+                // let power_level = 3565e6; // J/s
+                // let energy_fission = 200e6 * 1.602176634e-19; // J
 
                 // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-                let core_volume = 365.76 * 80891.3952;
-                let conversion = power_level / (energy_fission * core_volume);
+                // let core_volume = 365.76 * 80891.3952;
+                // let conversion = power_level / (energy_fission * core_volume);
                 let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
                 let fission_source =
                     xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux;
-                results.flux[energy][index] += flux * conversion;
+                results.flux[energy][index] += flux; //* conversion;
                 results.fission_source[index] += fission_source;
                 k_new += k * delta_x * fission_source
             }
         }
 
         results.k[x] = k;
-
-        // results.flux0 = results
-        //     .flux0
-        //     .iter()
-        //     .zip(&flux0)
-        //     .map(|(a, b)| a + b)
-        //     .collect();
-        // results.flux1 = results
-        //     .flux1
-        //     .iter()
-        //     .zip(&flux1)
-        //     .map(|(a, b)| a + b)
-        //     .collect();
-        // results.fission_source = results
-        //     .fission_source
-        //     .iter()
-        //     .zip(&fission_source)
-        //     .map(|(a, b)| a + b)
-        //     .collect();
-
-        // println!("k is {}", k);
     }
     results
 }
@@ -642,41 +695,41 @@ fn main() {
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    // let results = match solution {
-    //     1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, fuel_indices, 1.0),
-    //     _ => SoltuionResults {
-    //         flux: Vec::new(),
-    //         fission_source: Vec::new(),
-    //         k: Vec::new(),
-    //     }, // not implemented
-    // };
+    let results = match solution {
+        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+        _ => SoltuionResults {
+            flux: Vec::new(),
+            fission_source: Vec::new(),
+            k: Vec::new(),
+        }, // not implemented
+    };
 
-    // let _ = plot_solution(
-    //     results,
-    //     variables.energygroups,
-    //     variables.generations,
-    //     meshid.len(),
-    //     meshid[meshid.len() - 1].mesh_right,
-    // );
+    let _ = plot_solution(
+        results,
+        variables.energygroups,
+        variables.generations,
+        meshid.len(),
+        meshid[meshid.len() - 1].mesh_right,
+    );
 
     // below is for timing
-    let mut now = SystemTime::now();
+    // let mut now = SystemTime::now();
 
-    for zyn in 0..100 {
-        if zyn % 10 == 0 {
-            print!(
-                "Average time over those 10 runs was {} seconds \n",
-                now.elapsed().unwrap().as_secs() / 10
-            );
-            now = SystemTime::now();
-        }
-        let results = match solution {
-            1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-            _ => SoltuionResults {
-                flux: Vec::new(),
-                fission_source: Vec::new(),
-                k: Vec::new(),
-            }, // not implemented
-        };
-    }
+    // for zyn in 0..100 {
+    //     if zyn % 10 == 0 {
+    //         print!(
+    //             "Average time over those 10000 runs was {} seconds \n",
+    //             now.elapsed().unwrap().as_secs() / 10
+    //         );
+    //         now = SystemTime::now();
+    //     }
+    //     let results = match solution {
+    //         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+    //         _ => SoltuionResults {
+    //             flux: Vec::new(),
+    //             fission_source: Vec::new(),
+    //             k: Vec::new(),
+    //         }, // not implemented
+    //     };
+    // }
 }
