@@ -424,8 +424,10 @@ fn particle_travel(
     xsdata: &XSData,
 ) -> (bool, Vec<Vec<f64>>, usize, f64, u8, f64) {
     // determine particle travel length
-    let s: f64 = -thread_rng().gen::<f64>().ln()
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let inv_sigtr =
+        xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let s: f64 = -(thread_rng().gen::<f64>().ln()) * inv_sigtr;
+    // sum this and divide by number of particles, should be mean free path
     let mut delta_s: f64 = mu * s;
 
     let mut same_material = true;
@@ -548,27 +550,6 @@ fn monte_carlo(
         for _y in 0..variables.histories {
             tally = particle_lifetime(tally, xsdata, meshid, &fuel_indices, variables, delta_x)
         }
-
-        for energy in 0..variables.energygroups as usize {
-            for index in 0..tally[energy].len() {
-                let delta_x = meshid[index].delta_x;
-                let matid = meshid[index].matid;
-                let power_level = 3565e6; // J/s
-                let energy_fission = 200e6 * 1.602176634e-19; // J
-
-                // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-                let core_volume = 365.76 * 80891.3952;
-                let conversion = power_level / (energy_fission * core_volume);
-                let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
-                let fission_source =
-                    xsdata.nut[matid as usize] * xsdata.sigf[matid as usize] * flux;
-                results.flux[energy][index] += flux * conversion;
-                results.fission_source[index] += fission_source;
-                k_new += k * delta_x * fission_source
-            }
-        }
-
-        results.k[x] = k;
 
         for energy in 0..variables.energygroups as usize {
             for index in 0..tally[energy].len() {
