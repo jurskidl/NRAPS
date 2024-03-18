@@ -47,8 +47,8 @@ NumAss   = 2
 NumRods  = 17
 RodDia   = 0.94
 RodPitch = 1.262
-MPFR = 1
-MPWR = 2
+MPFR = 7
+MPWR = 4
 
 # You have to specify the boundary conditions after you set the number of energy groups #
 # BoundL  = Left Boundary Condition                                                     #
