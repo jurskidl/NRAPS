@@ -489,39 +489,44 @@ fn particle_travel(
 }
 
 fn particle_lifetime(
-    mut tally: Vec<Vec<f64>>,
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
     fuel_indices: &Vec<usize>,
     variables: &Variables,
     delta_x: &DeltaX,
+    start: usize,
+    end: usize,
 ) -> Vec<Vec<f64>> {
-    // spawn_sub_mesh is the partial distance through the mesh
-    let (mut mesh_index, spawn_sub_mesh, mut mu, mut neutron_energy) =
-        spawn_neutron(fuel_indices, &variables, &xsdata, &meshid);
-    let mut start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
+    let mut tally: Vec<Vec<f64>> = vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
 
-    let mut particle_exists: bool = true;
-    while particle_exists == true {
-        (
-            particle_exists,
-            tally,
-            mesh_index,
-            mu,
-            neutron_energy,
-            start_x,
-        ) = particle_travel(
-            tally,
-            meshid,
-            mesh_index,
-            neutron_energy,
-            mu,
-            start_x,
-            variables.mattypes,
-            variables.boundr,
-            variables.boundl,
-            xsdata,
-        );
+    for _y in start..=end {
+        // spawn_sub_mesh is the partial distance through the mesh
+        let (mut mesh_index, spawn_sub_mesh, mut mu, mut neutron_energy) =
+            spawn_neutron(fuel_indices, &variables, &xsdata, &meshid);
+        let mut start_x: f64 = meshid[mesh_index].mesh_left + (spawn_sub_mesh * delta_x.fuel);
+
+        let mut particle_exists: bool = true;
+        while particle_exists == true {
+            (
+                particle_exists,
+                tally,
+                mesh_index,
+                mu,
+                neutron_energy,
+                start_x,
+            ) = particle_travel(
+                tally,
+                meshid,
+                mesh_index,
+                neutron_energy,
+                mu,
+                start_x,
+                variables.mattypes,
+                variables.boundr,
+                variables.boundl,
+                xsdata,
+            );
+        }
     }
     return tally;
 }
@@ -547,9 +552,46 @@ fn monte_carlo(
         let k = k_new;
         k_new = 0.0;
 
-        for _y in 0..variables.histories {
-            tally = particle_lifetime(tally, xsdata, meshid, &fuel_indices, variables, delta_x)
-        }
+        // For Multithreading
+        let threads: usize = thread::available_parallelism().unwrap().get();
+        let threaded_histories = variables.histories / threads;
+        let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
+        let mut ending_points: Vec<usize> =
+            Vec::from_iter(starting_points[1..threads].iter().cloned());
+        ending_points.push(variables.histories);
+
+        std::thread::scope(|scope| {
+            let mut tallies = Vec::with_capacity(threads);
+            for thread in 0..threads {
+                let start = starting_points[thread];
+                let end = ending_points[thread];
+                // let buffer = &mapped_file;
+                let tallied: thread::ScopedJoinHandle<'_, Vec<Vec<f64>>> = scope.spawn(move || {
+                    {
+                        particle_lifetime(
+                            xsdata,
+                            meshid,
+                            fuel_indices,
+                            variables,
+                            delta_x,
+                            start,
+                            end,
+                        )
+                    }
+                });
+                tallies.push(tallied);
+            }
+
+            // Aggregate the results
+            for tallied in tallies {
+                let thread_result = tallied.join().unwrap();
+                for energy in 0..variables.energygroups as usize {
+                    for index in 0..thread_result[energy].len() as usize {
+                        tally[energy][index] += thread_result[energy][index]
+                    }
+                }
+            }
+        });
 
         for energy in 0..variables.energygroups as usize {
             for index in 0..tally[energy].len() {
