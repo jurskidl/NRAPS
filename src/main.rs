@@ -388,12 +388,10 @@ fn cross_mesh(
 
 fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
     let interaction: f64 = thread_rng().gen();
-    let capture: f64 = (xsdata.siga[xs_index] - xsdata.sigf[xs_index]) * xsdata.inv_sigtr[xs_index];
+    let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
-    if interaction < capture {
-        return (false, neutron_energy, 0.0);
-    } else if interaction < fission {
+    if interaction < absorption {
         return (false, neutron_energy, 0.0);
     } else if interaction < in_scatter {
         return (
@@ -546,6 +544,14 @@ fn monte_carlo(
         k: vec![0.0; variables.generations],
     };
 
+    let power_level = 3565e6; // J/s
+    let energy_fission = 200e6 * 1.602176634e-19; // J
+
+    // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
+    let diameter:f64 = 2.0 *((50952.0 * variables.rodpitch) / 3.14159265358979323846264338327950288_f64).sqrt();
+    let core_slice: f64 = 365.76 * diameter;
+    let conversion: f64 = power_level / (energy_fission * core_slice);
+
     for x in 0..variables.generations {
         let mut tally: Vec<Vec<f64>> =
             vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
@@ -597,18 +603,12 @@ fn monte_carlo(
             for index in 0..tally[energy].len() {
                 let delta_x = meshid[index].delta_x;
                 let matid = meshid[index].matid;
-                // let power_level = 3565e6; // J/s
-                // let energy_fission = 200e6 * 1.602176634e-19; // J
-
-                // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-                // let core_volume = 365.76 * 80891.3952;
-                // let conversion = power_level / (energy_fission * core_volume);
                 let flux = tally[energy][index] / (k * variables.histories as f64 * delta_x);
                 let fission_source = xsdata.nut
                     [(matid + (variables.mattypes * energy as u8)) as usize]
                     * xsdata.sigf[(matid + (variables.mattypes * energy as u8)) as usize]
                     * flux;
-                results.flux[energy][index] += flux; //* conversion;
+                results.flux[energy][index] += flux* conversion;
                 results.fission_source[index] += fission_source;
                 k_new += k * delta_x * fission_source
             }
