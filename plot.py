@@ -15,8 +15,14 @@ for line in open('vars.csv', 'r'):
 
     count += 1
 
+count = 1
 for line in open('k_eff.csv', 'r'):
-    k_eff = np.array(line.strip().split(',')).astype(float)
+    if count == 1:
+        k = np.array(line.strip().split(',')).astype(float)
+    elif count == 2:
+        k_fund = np.array(line.strip().split(',')).astype(float)
+
+    count += 1
 
 count = 1
 for line in open('interface.csv', 'r'):
@@ -24,6 +30,10 @@ for line in open('interface.csv', 'r'):
         flux0 = np.array(line.strip().split(',')).astype(float)
     elif count == 2:
         flux1 = np.array(line.strip().split(',')).astype(float)
+    elif count == 3:
+        average0 = np.array(line.strip().split(',')).astype(float)
+    elif count == 4:
+        average1 = np.array(line.strip().split(',')).astype(float)
     else:
         fission = np.array(line.strip().split(',')).astype(float)
 
@@ -31,16 +41,18 @@ for line in open('interface.csv', 'r'):
 
 x = np.linspace(0.0, length, num=meshed)
 
-plt.plot(k_eff, 'o', markerfacecolor='none', label='multplication factor')
+plt.plot(k, 'o', markerfacecolor='none', label='multplication factor')
+plt.plot(k_fund, color='orange')
 plt.title('Multiplication Factor')
 plt.xlim(0, generations)
-plt.ylim(0,2)
+plt.ylim(0, 2)
 
 # plt.show()
 plt.savefig('./k_eff.svg', bbox_inches='tight')
 plt.clf()
 
 plt.plot(x, flux0, label='fast flux')
+plt.plot(x, average0, color='orange')
 plt.title('Fast Flux')
 plt.xlim(0, length)
 # plt.show()
@@ -48,6 +60,7 @@ plt.savefig('./fast_flux.svg', bbox_inches='tight')
 plt.clf()
 
 plt.plot(x, flux1, label='thermal flux')
+plt.plot(x, average1, color='orange')
 plt.title('Thermal Flux')
 plt.xlim(0, length)
 # plt.show()

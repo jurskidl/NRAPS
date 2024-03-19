@@ -31,7 +31,7 @@ struct Variables {
     solver: Solver,
     generations: usize,
     histories: usize,
-    skip: u16,
+    skip: usize,
     numass: u8,
     numrods: u8,
     roddia: f64,
@@ -66,8 +66,10 @@ struct Mesh {
 
 struct SoltuionResults {
     flux: Vec<Vec<f64>>,
+    assembly_average: Vec<Vec<f64>>,
     fission_source: Vec<f64>,
     k: Vec<f64>,
+    k_fund: Vec<f64>,
 }
 
 // If multithreading the input processing
@@ -540,17 +542,21 @@ fn monte_carlo(
     // println!("running monte carlo code");
     let mut results = SoltuionResults {
         flux: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
+        assembly_average: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
         fission_source: vec![0.0; meshid.len()],
         k: vec![0.0; variables.generations],
+        k_fund: vec![0.0; variables.generations],
     };
 
     let power_level = 3565e6; // J/s
     let energy_fission = 200e6 * 1.602176634e-19; // J
 
     // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-    let diameter:f64 = 2.0 *((50952.0 * variables.rodpitch) / 3.14159265358979323846264338327950288_f64).sqrt();
+    let diameter: f64 =
+        2.0 * ((50952.0 * variables.rodpitch) / 3.14159265358979323846264338327950288_f64).sqrt();
     let core_slice: f64 = 365.76 * diameter;
     let conversion: f64 = power_level / (energy_fission * core_slice);
+    let fund: f64 = 1.0 / (variables.generations - (variables.skip - 1)) as f64;
 
     for x in 0..variables.generations {
         let mut tally: Vec<Vec<f64>> =
@@ -571,7 +577,6 @@ fn monte_carlo(
             for thread in 0..threads {
                 let start = starting_points[thread];
                 let end = ending_points[thread];
-                // let buffer = &mapped_file;
                 let tallied: thread::ScopedJoinHandle<'_, Vec<Vec<f64>>> = scope.spawn(move || {
                     {
                         particle_lifetime(
@@ -608,14 +613,46 @@ fn monte_carlo(
                     [(matid + (variables.mattypes * energy as u8)) as usize]
                     * xsdata.sigf[(matid + (variables.mattypes * energy as u8)) as usize]
                     * flux;
-                results.flux[energy][index] += flux* conversion;
-                results.fission_source[index] += fission_source;
-                k_new += k * delta_x * fission_source
+                k_new += k * delta_x * fission_source;
+                if x >= variables.skip {
+                    results.flux[energy][index] += flux * conversion;
+                    results.fission_source[index] += fission_source * fund;
+                }
             }
         }
-
         results.k[x] = k_new;
     }
+
+    for energy in 0..variables.energygroups as usize {
+        let average_ass_1 = (0..results.flux[energy].len() / 2)
+            .into_iter()
+            .map(|x| results.flux[energy][x])
+            .sum::<f64>()
+            / (results.flux[energy].len() / 2) as f64;
+        let average_ass_2 = (results.flux[energy].len() / 2..results.flux[energy].len())
+            .into_iter()
+            .map(|x| results.flux[energy][x])
+            .sum::<f64>()
+            / (results.flux[energy].len() / 2) as f64;
+
+        for index in 0..results.flux[energy].len() / 2 {
+            results.assembly_average[energy][index] = average_ass_1;
+        }
+        for index in results.flux[energy].len() / 2..results.flux[energy].len() {
+            results.assembly_average[energy][index] = average_ass_2;
+        }
+    }
+
+    results.k_fund[variables.skip] = results.k[variables.skip];
+
+    for generations in (variables.skip + 1)..variables.generations {
+        results.k_fund[generations] = ((variables.skip)..=generations)
+            .into_iter()
+            .map(|x| results.k[x])
+            .sum::<f64>()
+            / (generations - (variables.skip - 1)) as f64;
+    }
+
     results
 }
 
@@ -626,12 +663,20 @@ fn plot_solution(
     number_meshes: usize,
     assembly_length: f64,
 ) -> Result<(), Box<dyn Error>> {
+    let output_k_fund: Vec<String> = results.k_fund.iter().map(|x| x.to_string()).collect();
     let output_k: Vec<String> = results.k.iter().map(|x| x.to_string()).collect();
     let mut output_flux =
         vec![vec!["0.0".to_string(); results.fission_source.len()]; energygroups as usize];
     for energy in 0..energygroups as usize {
         for index in 0..results.fission_source.len() {
             output_flux[energy][index] = results.flux[energy][index].to_string();
+        }
+    }
+    let mut output_average =
+        vec![vec!["0.0".to_string(); results.fission_source.len()]; energygroups as usize];
+    for energy in 0..energygroups as usize {
+        for index in 0..results.fission_source.len() {
+            output_average[energy][index] = results.assembly_average[energy][index].to_string();
         }
     }
     let output_fission: Vec<String> = results
@@ -650,12 +695,16 @@ fn plot_solution(
     let mut wtr_k = Writer::from_path("./k_eff.csv")?;
 
     wtr_k.write_record(&output_k)?;
+    wtr_k.write_record(&output_k_fund)?;
     wtr_k.flush()?;
 
     let mut wtr = Writer::from_path("./interface.csv")?;
 
     for energy in 0..energygroups as usize {
         wtr.write_record(&output_flux[energy])?;
+    }
+    for energy in 0..energygroups as usize {
+        wtr.write_record(&output_average[energy])?;
     }
     wtr.write_record(&output_fission)?;
     wtr.flush()?;
@@ -666,6 +715,8 @@ fn plot_solution(
 }
 
 fn main() {
+    let now = SystemTime::now();
+
     let (variables, xsdata, matid, deltax, solution) = process_input();
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
@@ -674,8 +725,10 @@ fn main() {
         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
         _ => SoltuionResults {
             flux: Vec::new(),
+            assembly_average: Vec::new(),
             fission_source: Vec::new(),
             k: Vec::new(),
+            k_fund: Vec::new(),
         }, // not implemented
     };
 
@@ -685,6 +738,11 @@ fn main() {
         variables.generations,
         meshid.len(),
         meshid[meshid.len() - 1].mesh_right,
+    );
+
+    print!(
+        "Run was completed in {} milliseconds \n",
+        now.elapsed().unwrap().as_millis()
     );
 
     // below is for timing
