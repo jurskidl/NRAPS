@@ -1,6 +1,3 @@
-use csv::Writer;
-use memmap2::MmapOptions;
-use rand::prelude::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs::File;
@@ -11,7 +8,10 @@ use std::thread;
 // Use these for timing
 use std::time::SystemTime;
 
-pub const NUM_VARS: usize = 24;
+use csv::Writer;
+use memmap2::MmapOptions;
+use rand::prelude::*;
+
 pub const EQUALS: u8 = 61;
 pub const SPACE: u8 = 32;
 pub const NEWLINE: u8 = 10;
@@ -64,7 +64,7 @@ struct Mesh {
     mesh_right: f64,
 }
 
-struct SoltuionResults {
+struct SolutionResults {
     flux: Vec<Vec<f64>>,
     assembly_average: Vec<Vec<f64>>,
     fission_source: Vec<f64>,
@@ -88,7 +88,7 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
 }
 
 fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, String> {
-    let mut hash: HashMap<String, String> = HashMap::with_capacity(NUM_VARS);
+    let mut hash: HashMap<String, String> = HashMap::with_capacity(24);
 
     let mut pos = start;
     let mut line_start = start;
@@ -122,8 +122,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
                     hash.entry(key)
                         .and_modify(|existing| *existing = existing.to_owned() + " " + &value) // I don't know why this works but the gods have smiled upon me
                         .or_insert(value);
-                } else {
-                }
+                } else {}
                 line_start = pos + 1;
             }
             _ => {}
@@ -186,8 +185,8 @@ fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
         numass: hash.get("numass").unwrap().trim().parse().unwrap(),
         numrods: hash.get("numrods").unwrap().trim().parse().unwrap(),
         roddia: hash.get("roddia").unwrap().trim().parse().unwrap(),
-        rodpitch: (hash.get("rodpitch").unwrap().trim().parse::<f64>().unwrap()
-            - hash.get("roddia").unwrap().trim().parse::<f64>().unwrap()),
+        rodpitch: hash.get("rodpitch").unwrap().trim().parse::<f64>().unwrap()
+            - hash.get("roddia").unwrap().trim().parse::<f64>().unwrap(),
         mpfr: hash.get("mpfr").unwrap().trim().parse().unwrap(),
         mpwr: hash.get("mpwr").unwrap().trim().parse().unwrap(),
         boundl: hash.get("boundl").unwrap().trim().parse().unwrap(),
@@ -272,18 +271,12 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh
         })
         .collect();
 
-    // We want to remove the extra water meshes from the center of the array
-    // take advantage of code bitshifting instead of dividing in this case by dividing uan int by 2
-    for _index in 0..variables.mpwr {
-        temp.remove(temp.len() / 2);
-    }
-
     // More generic version
-    // for index1 in 0..numass - 1 {
-    //     for index2 in 0..mpwr {
-    //         temp.remove((index1 * temp.len()) / numass);
-    //     }
-    // }
+    for index1 in 1..variables.numass {
+        for _index2 in 0..variables.mpwr {
+            temp.remove(((index1 * temp.len() as u8) / variables.numass) as usize);
+        }
+    }
 
     // MPWR/2 will be rounded down in the case of an odd int
     temp.drain(0..(variables.mpwr / 2));
@@ -304,7 +297,7 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh
             let temp = Mesh {
                 matid: item,
                 delta_x: deltax.fuel,
-                mesh_left: mesh_left,
+                mesh_left,
                 mesh_right: mesh_left + deltax.fuel,
             };
             mesh.push(temp);
@@ -313,7 +306,7 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh
             let temp = Mesh {
                 matid: item,
                 delta_x: deltax.water,
-                mesh_left: mesh_left,
+                mesh_left,
                 mesh_right: mesh_left + deltax.water,
             };
             mesh.push(temp);
@@ -344,24 +337,12 @@ fn spawn_neutron(
         })
         .collect();
     let neutron_energy = chit.iter().position(|&x| x > chi).unwrap() as u8;
-    match variables.energygroups {
-        4 => {
-            return (
-                index,
-                thread_rng().gen(),
-                2.0 * (thread_rng().gen::<f64>()) - 1.0,
-                neutron_energy,
-            );
-        }
-        _ => {
-            return (
-                fuel_indices[thread_rng().gen_range(0..fuel_indices.len())],
-                thread_rng().gen(),
-                2.0 * (thread_rng().gen::<f64>()) - 1.0,
-                0,
-            )
-        }
-    }
+    (
+        index,
+        thread_rng().gen(),
+        2.0 * (thread_rng().gen::<f64>()) - 1.0,
+        neutron_energy,
+    )
 }
 
 fn hit_boundary(mu: f64, start_x: f64, delta_s: f64, bound: f64, mesh_end: f64) -> (f64, f64, f64) {
@@ -441,8 +422,8 @@ fn particle_travel(
 
         if (mu < 0.0 && (mesh_end - start_x) > (end_x - start_x) && mesh_index == 0)
             || (mu >= 0.0
-                && (end_x - start_x) > (mesh_end - start_x)
-                && mesh_index == meshid.len() - 1)
+            && (end_x - start_x) > (mesh_end - start_x)
+            && mesh_index == meshid.len() - 1)
         {
             // hit the boundary
             tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
@@ -482,7 +463,7 @@ fn particle_travel(
             delta_s = mu
                 * -thread_rng().gen::<f64>().ln()
                 * xsdata.inv_sigtr
-                    [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+                [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
         }
     }
     (true, tally, mesh_index, mu, neutron_energy, start_x)
@@ -532,15 +513,16 @@ fn particle_lifetime(
 }
 
 fn monte_carlo(
+    threads: usize,
     variables: &Variables,
     xsdata: &XSData,
     delta_x: &DeltaX,
     meshid: &Vec<Mesh>,
     fuel_indices: &Vec<usize>,
     mut k_new: f64,
-) -> SoltuionResults {
+) -> SolutionResults {
     // println!("running monte carlo code");
-    let mut results = SoltuionResults {
+    let mut results = SolutionResults {
         flux: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
         assembly_average: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
         fission_source: vec![0.0; meshid.len()],
@@ -553,7 +535,7 @@ fn monte_carlo(
 
     // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
     let diameter: f64 =
-        2.0 * ((50952.0 * variables.rodpitch) / 3.14159265358979323846264338327950288_f64).sqrt();
+        2.0 * ((50952.0 * variables.rodpitch) / std::f64::consts::PI).sqrt();
     let core_slice: f64 = 365.76 * diameter;
     let conversion: f64 = power_level / (energy_fission * core_slice);
     let fund: f64 = 1.0 / (variables.generations - (variables.skip - 1)) as f64;
@@ -564,8 +546,18 @@ fn monte_carlo(
         let k = k_new;
         k_new = 0.0;
 
+        // let tally = particle_lifetime(
+        //                         xsdata,
+        //                         meshid,
+        //                         fuel_indices,
+        //                         variables,
+        //                         delta_x,
+        //                         0,
+        //                         variables.histories,
+        //                     );
+
         // For Multithreading
-        let threads: usize = thread::available_parallelism().unwrap().get();
+        // let threads: usize = 14; //thread::available_parallelism().unwrap().get();
         let threaded_histories = variables.histories / threads;
         let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
         let mut ending_points: Vec<usize> =
@@ -657,7 +649,7 @@ fn monte_carlo(
 }
 
 fn plot_solution(
-    results: SoltuionResults,
+    results: SolutionResults,
     energygroups: u8,
     generations: usize,
     number_meshes: usize,
@@ -685,29 +677,35 @@ fn plot_solution(
         .map(|x| x.to_string())
         .collect();
 
-    let mut wtr_vars = Writer::from_path("./vars.csv")?;
+    let _handle1 = thread::spawn(move || {
+        let mut wtr_vars = Writer::from_path("./vars.csv").expect("failed to open vars.csv");
 
-    wtr_vars.write_record([&assembly_length.to_string()])?;
-    wtr_vars.write_record([&number_meshes.to_string()])?;
-    wtr_vars.write_record([&generations.to_string()])?;
-    wtr_vars.flush()?;
+        wtr_vars.write_record([&assembly_length.to_string()]).expect("failed to write to vars.csv");
+        wtr_vars.write_record([&number_meshes.to_string()]).expect("failed to write to vars.csv");
+        wtr_vars.write_record([&generations.to_string()]).expect("failed to write to vars.csv");
+        wtr_vars.flush().expect("failed to clear buffer");
+    });
 
-    let mut wtr_k = Writer::from_path("./k_eff.csv")?;
+    let _handle2 = thread::spawn(move || {
+        let mut wtr_k = Writer::from_path("./k_eff.csv").expect("failed to open k_eff.csv");
 
-    wtr_k.write_record(&output_k)?;
-    wtr_k.write_record(&output_k_fund)?;
-    wtr_k.flush()?;
+        wtr_k.write_record(&output_k).expect("failed to write to k_eff.csv");
+        wtr_k.write_record(&output_k_fund).expect("failed to write to k_eff.csv");
+        wtr_k.flush().expect("failed to clear buffer");
+    });
 
-    let mut wtr = Writer::from_path("./interface.csv")?;
+    let _handle3 = thread::spawn(move || {
+        let mut wtr = Writer::from_path("./interface.csv").expect("failed to open interface.csv");
 
-    for energy in 0..energygroups as usize {
-        wtr.write_record(&output_flux[energy])?;
-    }
-    for energy in 0..energygroups as usize {
-        wtr.write_record(&output_average[energy])?;
-    }
-    wtr.write_record(&output_fission)?;
-    wtr.flush()?;
+        for energy in 0..energygroups as usize {
+            wtr.write_record(&output_flux[energy]).expect("failed write to interface.csv");
+        }
+        for energy in 0..energygroups as usize {
+            wtr.write_record(&output_average[energy]).expect("failed write to interface.csv");
+        }
+        wtr.write_record(&output_fission).expect("failed write to interface.csv");
+        wtr.flush().expect("failed to clear buffer");
+    });
 
     Command::new("python").arg("plot.py").spawn()?;
 
@@ -715,54 +713,58 @@ fn plot_solution(
 }
 
 fn main() {
-    let now = SystemTime::now();
+    // let now = SystemTime::now();
 
     let (variables, xsdata, matid, deltax, solution) = process_input();
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    let results = match solution {
-        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-        _ => SoltuionResults {
-            flux: Vec::new(),
-            assembly_average: Vec::new(),
-            fission_source: Vec::new(),
-            k: Vec::new(),
-            k_fund: Vec::new(),
-        }, // not implemented
-    };
-
-    let _ = plot_solution(
-        results,
-        variables.energygroups,
-        variables.generations,
-        meshid.len(),
-        meshid[meshid.len() - 1].mesh_right,
-    );
-
-    print!(
-        "Run was completed in {} milliseconds \n",
-        now.elapsed().unwrap().as_millis()
-    );
+    // let results = match solution {
+    //     1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+    //     _ => SoltuionResults {
+    //         flux: Vec::new(),
+    //         assembly_average: Vec::new(),
+    //         fission_source: Vec::new(),
+    //         k: Vec::new(),
+    //         k_fund: Vec::new(),
+    //     }, // not implemented
+    // };
+    //
+    // let _ = plot_solution(
+    //     results,
+    //     variables.energygroups,
+    //     variables.generations,
+    //     meshid.len(),
+    //     meshid[meshid.len() - 1].mesh_right,
+    // );
+    //
+    // print!(
+    //     "Run was completed in {} milliseconds \n",
+    //     now.elapsed().unwrap().as_micros()
+    // );
 
     // below is for timing
-    // let mut now = SystemTime::now();
+    let mut now = SystemTime::now();
 
-    // for zyn in 0..100 {
-    //     if zyn % 10 == 0 {
-    //         print!(
-    //             "Average time over those 10000 runs was {} seconds \n",
-    //             now.elapsed().unwrap().as_secs() / 10
-    //         );
-    //         now = SystemTime::now();
-    //     }
-    //     let results = match solution {
-    //         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-    //         _ => SoltuionResults {
-    //             flux: Vec::new(),
-    //             fission_source: Vec::new(),
-    //             k: Vec::new(),
-    //         }, // not implemented
-    //     };
-    // }
+    for threads in 1..17 {
+        for zyn in 0..11 {
+            if zyn % 10 == 0 {
+                print!(
+                    "Average time for {} was {} microseconds \n", threads,
+                    now.elapsed().unwrap().as_micros() / 10
+                );
+                now = SystemTime::now();
+            }
+            let results = match solution {
+                1 => monte_carlo(threads, &variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+                _ => SolutionResults {
+                    flux: Vec::new(),
+                    assembly_average: Vec::new(),
+                    fission_source: Vec::new(),
+                    k: Vec::new(),
+                    k_fund: Vec::new(),
+                }, // not implemented
+            };
+        }
+    }
 }
