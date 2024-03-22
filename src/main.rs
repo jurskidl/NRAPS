@@ -12,10 +12,10 @@ use csv::Writer;
 use memmap2::MmapOptions;
 use rand::prelude::*;
 
-pub const EQUALS: u8 = 61;
-pub const SPACE: u8 = 32;
-pub const NEWLINE: u8 = 10;
-pub const POUND: u8 = 35;
+const EQUALS: u8 = 61;
+const SPACE: u8 = 32;
+const NEWLINE: u8 = 10;
+const POUND: u8 = 35;
 
 pub enum Solver {
     LinAlg,
@@ -72,6 +72,14 @@ struct SolutionResults {
     k_fund: Vec<f64>,
 }
 
+// If multithreading the input processing
+// fn next_end_line(mut end: usize, buffer: &[u8]) -> usize {
+//     while buffer[end] != NEWLINE && end < buffer.len() {
+//         end += 1;
+//     }
+//     end + 1
+// }
+
 fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     while buffer[pos] != NEWLINE && pos < end {
         pos += 1;
@@ -86,6 +94,11 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
     let mut line_start = start;
     let mut name_end = start;
     let mut val_start = start;
+
+    // If multithreading
+    // if end != buffer.len() && buffer[end] != NEWLINE {
+    //     end = next_end_line(end, buffer);
+    // }
 
     while pos < end {
         match buffer[pos] {
@@ -125,6 +138,36 @@ fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
     let start: usize = 0;
     let end: usize = mapped_file.len();
     let hash: HashMap<String, String> = scan_ascii_chunk(start, end, &&mapped_file);
+
+    // For Multithreading
+    // let size: usize = mapped_file.len();
+    // let threads: usize = thread::available_parallelism().unwrap().get();
+    // let chunk_length = size / threads;
+    // let starting_points: Vec<usize> = (0..threads).map(|x| x * chunk_length).collect();
+    // let mut ending_points: Vec<usize> = Vec::from_iter(starting_points[1..threads].iter().cloned());
+    // ending_points.push(size);
+
+    // let mut hash: HashMap<String, String> = HashMap::with_capacity(NUM_VARS);
+    // std::thread::scope(|scope| {
+    //     let mut handles = Vec::with_capacity(threads);
+    //     for thread in 0..threads {
+    //         let start = starting_points[thread];
+    //         let end = ending_points[thread];
+    //         let buffer = &mapped_file;
+    //         let handle = scope.spawn(move || scan_ascii_chunk(start, end, &buffer));
+    //         handles.push(handle);
+    //     }
+
+    //     // Aggregate the results
+    //     for handle in handles {
+    //         let chunk_result = handle.join().unwrap();
+    //         for (key, value) in chunk_result {
+    //             hash.entry(key.trim().to_string())
+    //                 .and_modify(|existing| *existing = existing.to_owned() + " " + &value)
+    //                 .or_insert(value);
+    //         }
+    //     }
+    // });
 
     let variables = Variables {
         analk: hash.get("analk").unwrap().trim().parse().unwrap(),
@@ -228,13 +271,15 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh
         })
         .collect();
 
-    // More generic version
+    // We want to remove the extra water meshes from the center of the array
+    // This assumes the assembly has water rods in the middle
     for index1 in 1..variables.numass {
         for _index2 in 0..variables.mpwr {
-            temp.remove(((index1 * temp.len() as u8) / variables.numass) as usize);
+            temp.remove((index1 as usize * temp.len()) / variables.numass as usize);
         }
     }
 
+    // This assumes the assembly starts and ends with a water rod
     // MPWR/2 will be rounded down in the case of an odd int
     temp.drain(0..(variables.mpwr / 2));
     temp.truncate(temp.len() - (variables.mpwr / 2));
@@ -274,9 +319,14 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh
     (mesh, fuel_indices)
 }
 
-fn spawn_neutron(fuel_indices: &Vec<usize>, variables: &Variables, xsdata: &XSData, meshid: &Vec<Mesh>) -> (usize, f64, f64, u8) {
+fn spawn_neutron(
+    fuel_indices: &Vec<usize>,
+    variables: &Variables,
+    xsdata: &XSData,
+    meshid: &Vec<Mesh>,
+) -> (usize, f64, f64, u8) {
     let index = fuel_indices[thread_rng().gen_range(0..fuel_indices.len())];
-    let chi: f64 = thread_rng().gen();
+    let chi: f64 = random();
     let mut temp = 0.0;
     let chit: Vec<f64> = xsdata
         .chit
@@ -291,8 +341,8 @@ fn spawn_neutron(fuel_indices: &Vec<usize>, variables: &Variables, xsdata: &XSDa
     let neutron_energy = chit.iter().position(|&x| x > chi).unwrap() as u8;
     (
         index,
-        thread_rng().gen(),
-        2.0 * (thread_rng().gen::<f64>()) - 1.0,
+        random::<f64>(),
+        2.0 * (random::<f64>()) - 1.0,
         neutron_energy,
     )
 }
@@ -305,7 +355,13 @@ fn hit_boundary(mu: f64, start_x: f64, delta_s: f64, bound: f64, mesh_end: f64) 
     )
 }
 
-fn cross_mesh(mesh_index: usize, mu: f64, start_x: f64, mesh_end: f64, delta_s: f64) -> (f64, f64, usize) {
+fn cross_mesh(
+    mesh_index: usize,
+    mu: f64,
+    start_x: f64,
+    mesh_end: f64,
+    delta_s: f64,
+) -> (f64, f64, usize) {
     let mesh_index = if mu >= 0.0 {
         mesh_index + 1
     } else {
@@ -316,26 +372,26 @@ fn cross_mesh(mesh_index: usize, mu: f64, start_x: f64, mesh_end: f64, delta_s: 
 }
 
 fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
-    let interaction: f64 = thread_rng().gen();
+    let interaction: f64 = random();
     let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
-    if interaction < absorption {
-        return (false, neutron_energy, 0.0);
+    return if interaction < absorption {
+        (false, neutron_energy, 0.0)
     } else if interaction < in_scatter {
-        return (
+        (
             true,
             neutron_energy,
-            2.0 * (thread_rng().gen::<f64>()) - 1.0,
-        );
+            2.0 * (random::<f64>()) - 1.0,
+        )
     } else {
         //down scatter
-        return (
+        (
             true,
             neutron_energy + 1,
-            2.0 * (thread_rng().gen::<f64>()) - 1.0,
-        );
-    }
+            2.0 * (random::<f64>()) - 1.0,
+        )
+    };
 }
 
 fn particle_travel(
@@ -351,7 +407,9 @@ fn particle_travel(
     xsdata: &XSData,
 ) -> (bool, Vec<Vec<f64>>, usize, f64, u8, f64) {
     // determine particle travel length
-    let s: f64 = -thread_rng().gen::<f64>().ln() * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let inv_sigtr =
+        xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let s: f64 = -random::<f64>().ln() * inv_sigtr;
     // sum this and divide by number of particles, should be mean free path
     let mut delta_s: f64 = mu * s;
 
@@ -405,7 +463,7 @@ fn particle_travel(
             neutron_energy = _neutron_energy;
             mu = _mu;
             delta_s = mu
-                * -thread_rng().gen::<f64>().ln()
+                * -random::<f64>().ln()
                 * xsdata.inv_sigtr
                 [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
         }
@@ -424,7 +482,7 @@ fn particle_lifetime(
 ) -> Vec<Vec<f64>> {
     let mut tally: Vec<Vec<f64>> = vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
 
-    for _y in start..end {
+    for _y in start..=end {
         // spawn_sub_mesh is the partial distance through the mesh
         let (mut mesh_index, spawn_sub_mesh, mut mu, mut neutron_energy) =
             spawn_neutron(fuel_indices, &variables, &xsdata, &meshid);
@@ -456,8 +514,20 @@ fn particle_lifetime(
     return tally;
 }
 
+fn average_assembly(mut results: SolutionResults, numass: u8, energygroups: u8) -> SolutionResults {
+    let mesh_assembly = results.flux[0].len() / numass as usize;
+    for energy in 0..energygroups as usize {
+        for assembly in 1..=numass as usize {
+            let average_ass: f64 = (((assembly - 1) * mesh_assembly)..(assembly * mesh_assembly)).into_iter().map(|x| results.flux[energy][x]).sum::<f64>() / mesh_assembly as f64;
+            for index in ((assembly - 1) * mesh_assembly)..(assembly * mesh_assembly) {
+                results.assembly_average[energy][index] = average_ass;
+            }
+        }
+    }
+    results
+}
+
 fn monte_carlo(
-    threads: usize,
     variables: &Variables,
     xsdata: &XSData,
     delta_x: &DeltaX,
@@ -478,57 +548,57 @@ fn monte_carlo(
     let energy_fission = 200e6 * 1.602176634e-19; // J
 
     // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-    let diameter: f64 = 2.0 * ((50952.0 * variables.rodpitch) / std::f64::consts::PI).sqrt();
+    let diameter: f64 =
+        2.0 * ((50952.0 * variables.rodpitch) / std::f64::consts::PI).sqrt();
     let core_slice: f64 = 365.76 * diameter;
     let conversion: f64 = power_level / (energy_fission * core_slice);
     let fund: f64 = 1.0 / (variables.generations - (variables.skip - 1)) as f64;
 
     for x in 0..variables.generations {
-        // let mut tally: Vec<Vec<f64>> =
-        //     vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
+        let mut tally: Vec<Vec<f64>> =
+            vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
         let k = k_new;
         k_new = 0.0;
 
-        let tally = particle_lifetime(
-            xsdata,
-            meshid,
-            fuel_indices,
-            variables,
-            delta_x,
-            0,
-            variables.histories,
-        );
-
         // For Multithreading
-        // let threads: usize = 14; //thread::available_parallelism().unwrap().get();
-        // let threaded_histories = variables.histories / threads;
-        // let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
-        // let mut ending_points: Vec<usize> = Vec::from_iter(starting_points[1..threads].iter().cloned());
-        // ending_points.push(variables.histories);
-        //
-        // thread::scope(|scope| {
-        //     let mut tallies = Vec::with_capacity(threads);
-        //     for thread in 0..threads {
-        //         let start = starting_points[thread];
-        //         let end = ending_points[thread];
-        //         let tallied: thread::ScopedJoinHandle<'_, Vec<Vec<f64>>> = scope.spawn(move || {
-        //             {
-        //                 particle_lifetime(xsdata, meshid, fuel_indices, variables, delta_x, start, end)
-        //             }
-        //         });
-        //         tallies.push(tallied);
-        //     }
-        //
-        //     // Aggregate the results
-        //     for tallied in tallies {
-        //         let thread_result = tallied.join().unwrap();
-        //         for energy in 0..variables.energygroups as usize {
-        //             for index in 0..thread_result[energy].len() as usize {
-        //                 tally[energy][index] += thread_result[energy][index]
-        //             }
-        //         }
-        //     }
-        // });
+        let threads: usize = thread::available_parallelism().unwrap().get();
+        let threaded_histories = variables.histories / threads;
+        let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
+        let mut ending_points: Vec<usize> =
+            Vec::from_iter(starting_points[1..threads].iter().cloned());
+        ending_points.push(variables.histories);
+
+        thread::scope(|scope| {
+            let mut tallies = Vec::with_capacity(threads);
+            for thread in 0..threads {
+                let start = starting_points[thread];
+                let end = ending_points[thread];
+                let tallied: thread::ScopedJoinHandle<'_, Vec<Vec<f64>>> = scope.spawn(move || {
+                    {
+                        particle_lifetime(
+                            xsdata,
+                            meshid,
+                            fuel_indices,
+                            variables,
+                            delta_x,
+                            start,
+                            end,
+                        )
+                    }
+                });
+                tallies.push(tallied);
+            }
+
+            // Aggregate the results
+            for tallied in tallies {
+                let thread_result = tallied.join().unwrap();
+                for energy in 0..variables.energygroups as usize {
+                    for index in 0..thread_result[energy].len() as usize {
+                        tally[energy][index] += thread_result[energy][index]
+                    }
+                }
+            }
+        });
 
         for energy in 0..variables.energygroups as usize {
             for index in 0..tally[energy].len() {
@@ -549,25 +619,7 @@ fn monte_carlo(
         results.k[x] = k_new;
     }
 
-    for energy in 0..variables.energygroups as usize {
-        let average_ass_1 = (0..results.flux[energy].len() / 2)
-            .into_iter()
-            .map(|x| results.flux[energy][x])
-            .sum::<f64>()
-            / (results.flux[energy].len() / 2) as f64;
-        let average_ass_2 = (results.flux[energy].len() / 2..results.flux[energy].len())
-            .into_iter()
-            .map(|x| results.flux[energy][x])
-            .sum::<f64>()
-            / (results.flux[energy].len() / 2) as f64;
-
-        for index in 0..results.flux[energy].len() / 2 {
-            results.assembly_average[energy][index] = average_ass_1;
-        }
-        for index in results.flux[energy].len() / 2..results.flux[energy].len() {
-            results.assembly_average[energy][index] = average_ass_2;
-        }
-    }
+    results = average_assembly(results, variables.numass, variables.energygroups);
 
     results.k_fund[variables.skip] = results.k[variables.skip];
 
@@ -611,48 +663,29 @@ fn plot_solution(
         .map(|x| x.to_string())
         .collect();
 
-    let _handle1 = thread::spawn(move || {
-        let mut wtr_vars = Writer::from_path("./vars.csv").expect("failed to open vars.csv");
+    let mut wtr_vars = Writer::from_path("./vars.csv")?;
 
-        wtr_vars
-            .write_record([&assembly_length.to_string()])
-            .expect("failed to write to vars.csv");
-        wtr_vars
-            .write_record([&number_meshes.to_string()])
-            .expect("failed to write to vars.csv");
-        wtr_vars
-            .write_record([&generations.to_string()])
-            .expect("failed to write to vars.csv");
-        wtr_vars.flush().expect("failed to clear buffer");
-    });
+    wtr_vars.write_record([&assembly_length.to_string()])?;
+    wtr_vars.write_record([&number_meshes.to_string()])?;
+    wtr_vars.write_record([&generations.to_string()])?;
+    wtr_vars.flush()?;
 
-    let _handle2 = thread::spawn(move || {
-        let mut wtr_k = Writer::from_path("./k_eff.csv").expect("failed to open k_eff.csv");
+    let mut wtr_k = Writer::from_path("./k_eff.csv")?;
 
-        wtr_k
-            .write_record(&output_k)
-            .expect("failed to write to k_eff.csv");
-        wtr_k
-            .write_record(&output_k_fund)
-            .expect("failed to write to k_eff.csv");
-        wtr_k.flush().expect("failed to clear buffer");
-    });
+    wtr_k.write_record(&output_k)?;
+    wtr_k.write_record(&output_k_fund)?;
+    wtr_k.flush()?;
 
-    let _handle3 = thread::spawn(move || {
-        let mut wtr = Writer::from_path("./interface.csv").expect("failed to open interface.csv");
+    let mut wtr = Writer::from_path("./interface.csv")?;
 
-        for energy in 0..energygroups as usize {
-            wtr.write_record(&output_flux[energy])
-                .expect("failed write to interface.csv");
-        }
-        for energy in 0..energygroups as usize {
-            wtr.write_record(&output_average[energy])
-                .expect("failed write to interface.csv");
-        }
-        wtr.write_record(&output_fission)
-            .expect("failed write to interface.csv");
-        wtr.flush().expect("failed to clear buffer");
-    });
+    for energy in 0..energygroups as usize {
+        wtr.write_record(&output_flux[energy])?;
+    }
+    for energy in 0..energygroups as usize {
+        wtr.write_record(&output_average[energy])?;
+    }
+    wtr.write_record(&output_fission)?;
+    wtr.flush()?;
 
     Command::new("python").arg("plot.py").spawn()?;
 
@@ -660,67 +693,54 @@ fn plot_solution(
 }
 
 fn main() {
-    // let now = SystemTime::now();
+    let now = SystemTime::now();
 
     let (variables, xsdata, matid, deltax, solution) = process_input();
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    // let results = match solution {
-    //     1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-    //     _ => SoltuionResults {
-    //         flux: Vec::new(),
-    //         assembly_average: Vec::new(),
-    //         fission_source: Vec::new(),
-    //         k: Vec::new(),
-    //         k_fund: Vec::new(),
-    //     }, // not implemented
-    // };
-    //
-    // let _ = plot_solution(
-    //     results,
-    //     variables.energygroups,
-    //     variables.generations,
-    //     meshid.len(),
-    //     meshid[meshid.len() - 1].mesh_right,
-    // );
-    //
-    // print!(
-    //     "Run was completed in {} milliseconds \n",
-    //     now.elapsed().unwrap().as_micros()
-    // );
+    let results = match solution {
+        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+        _ => SolutionResults {
+            flux: Vec::new(),
+            assembly_average: Vec::new(),
+            fission_source: Vec::new(),
+            k: Vec::new(),
+            k_fund: Vec::new(),
+        }, // not implemented
+    };
+
+    let _ = plot_solution(
+        results,
+        variables.energygroups,
+        variables.generations,
+        meshid.len(),
+        meshid[meshid.len() - 1].mesh_right,
+    );
+
+    print!(
+        "Run was completed in {} milliseconds \n",
+        now.elapsed().unwrap().as_millis()
+    );
 
     // below is for timing
-    let mut now = SystemTime::now();
+    // let mut now = SystemTime::now();
 
-    // for threads in 1..17 {
-    for zyn in 0..11 {
-        if zyn % 10 == 0 {
-            print!(
-                "Average time for 1 was {} microseconds \n",
-                // threads,
-                now.elapsed().unwrap().as_micros() / 10
-            );
-            now = SystemTime::now();
-        }
-        let results = match solution {
-            1 => monte_carlo(
-                1,// threads,
-                &variables,
-                &xsdata,
-                &deltax,
-                &meshid,
-                &fuel_indices,
-                1.0,
-            ),
-            _ => SolutionResults {
-                flux: Vec::new(),
-                assembly_average: Vec::new(),
-                fission_source: Vec::new(),
-                k: Vec::new(),
-                k_fund: Vec::new(),
-            }, // not implemented
-        };
-    }
+    // for zyn in 0..100 {
+    //     if zyn % 10 == 0 {
+    //         print!(
+    //             "Average time over those 10000 runs was {} seconds \n",
+    //             now.elapsed().unwrap().as_secs() / 10
+    //         );
+    //         now = SystemTime::now();
+    //     }
+    //     let results = match solution {
+    //         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+    //         _ => SolutionResults {
+    //             flux: Vec::new(),
+    //             fission_source: Vec::new(),
+    //             k: Vec::new(),
+    //         }, // not implemented
+    //     };
     // }
 }
