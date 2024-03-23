@@ -33,7 +33,7 @@ solver   = 3
 #               Carlo method.                                                           #
 Generations = 100
 Histories = 1000000
-Skip = 5
+Skip = 1
 
 # NumRods  = Number of unit cells to be used in this problem.  A unit cell includes both#
 #           the fuel rod and half of the gap between itself and the next fuel rod.      #
@@ -47,7 +47,7 @@ NumAss   = 2
 NumRods  = 17
 RodDia   = 0.94
 RodPitch = 1.262
-MPFR = 7
+MPFR = 8
 MPWR = 4
 
 # You have to specify the boundary conditions after you set the number of energy groups #
@@ -64,9 +64,9 @@ BoundR = 1.0
 
 XSData
     #           Test Case A cross section data                                          #
-    #             Energy Group 1                        Energy Group 2                  #
-    #        UO2    MOX    H2O   CR     UO2   MOX   H2O   CR        #
-    #         0      1      2     3      0     1     2     3        #
+    #             Energy Group 1            Energy Group 2                              #
+    #        UO2    MOX    H2O   CR     UO2   MOX   H2O   CR                            #
+    #         0      1      2     3      0     1     2     3                            #
     SigTR = 0.200  0.200  0.200  0.1    1.00  1.20  1.10  1.1
     SigIS = 0.185  0.185  0.170  0.0    0.80  0.80  1.10  0.1
     SigDS = 0.015  0.015  0.030  0.0    0.00  0.00  0.00  0.0

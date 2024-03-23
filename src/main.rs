@@ -264,9 +264,9 @@ fn mesh_gen(matid: Vec<u8>, variables: &Variables, deltax: &DeltaX) -> (Vec<Mesh
         .into_iter()
         .flat_map(|x| {
             if x == 0 || x == 1 {
-                repeat(x).take(variables.mpfr as usize)
+                repeat(x).take(variables.mpfr)
             } else {
-                repeat(x).take(variables.mpwr as usize)
+                repeat(x).take(variables.mpwr)
             }
         })
         .collect();
@@ -430,7 +430,19 @@ fn particle_travel(
             // hit the boundary
             tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
             let bound = if mu >= 0.0 { boundr } else { boundl };
-            (mu, delta_s, start_x) = hit_boundary(mu, start_x, delta_s, bound, mesh_end);
+            
+            if bound > 0.0 {
+                (mu, delta_s, start_x) = hit_boundary(mu, start_x, delta_s, bound, mesh_end);
+            } else {
+                return (
+                    false,
+                    tally,
+                    mesh_index,
+                    mu,
+                    neutron_energy,
+                    start_x,
+                );
+            }
         } else if (end_x - start_x).abs() > (mesh_end - start_x).abs() {
             // cross mesh boundary
             tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
@@ -544,16 +556,6 @@ fn monte_carlo(
         k_fund: vec![0.0; variables.generations],
     };
 
-    let power_level = 3565e6; // J/s
-    let energy_fission = 200e6 * 1.602176634e-19; // J
-
-    // A_core = N_rods * pitch^2, where N_rods = 193 assemblies * 264 rods / assembly and pitch is 1.26
-    let diameter: f64 =
-        2.0 * ((50952.0 * variables.rodpitch) / std::f64::consts::PI).sqrt();
-    let core_slice: f64 = 365.76 * diameter;
-    let conversion: f64 = power_level / (energy_fission * core_slice);
-    let fund: f64 = 1.0 / (variables.generations - (variables.skip - 1)) as f64;
-
     for x in 0..variables.generations {
         let mut tally: Vec<Vec<f64>> =
             vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
@@ -561,7 +563,8 @@ fn monte_carlo(
         k_new = 0.0;
 
         // For Multithreading
-        let threads: usize = thread::available_parallelism().unwrap().get();
+        // One threads for the OS to use
+        let threads: usize = thread::available_parallelism().unwrap().get() - 1;
         let threaded_histories = variables.histories / threads;
         let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
         let mut ending_points: Vec<usize> =
@@ -593,12 +596,13 @@ fn monte_carlo(
             for tallied in tallies {
                 let thread_result = tallied.join().unwrap();
                 for energy in 0..variables.energygroups as usize {
-                    for index in 0..thread_result[energy].len() as usize {
+                    for index in 0..thread_result[energy].len() {
                         tally[energy][index] += thread_result[energy][index]
                     }
                 }
             }
         });
+        let fund: f64 = 1.0 / (variables.generations - (variables.skip - 1)) as f64;
 
         for energy in 0..variables.energygroups as usize {
             for index in 0..tally[energy].len() {
@@ -611,7 +615,9 @@ fn monte_carlo(
                     * flux;
                 k_new += k * delta_x * fission_source;
                 if x >= variables.skip {
-                    results.flux[energy][index] += flux * conversion;
+                    let conversion: f64 = (3565e6 * k)
+                        / (200e6 * 1.602176634e-19 * xsdata.nut[(0 + (variables.mattypes * 1)) as usize] * meshid[meshid.len() - 1].mesh_right);
+                    results.flux[energy][index] += flux * conversion * fund;
                     results.fission_source[index] += fission_source * fund;
                 }
             }
