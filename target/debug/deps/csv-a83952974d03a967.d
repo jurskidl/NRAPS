@@ -1,0 +1,15 @@
+/home/dylan/GitHub/NRAPS/target/debug/deps/libcsv-a83952974d03a967.rmeta: /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/lib.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/byte_record.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/cookbook.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/debug.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/deserializer.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/error.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/reader.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/serializer.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/string_record.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/tutorial.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/writer.rs
+
+/home/dylan/GitHub/NRAPS/target/debug/deps/csv-a83952974d03a967.d: /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/lib.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/byte_record.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/cookbook.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/debug.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/deserializer.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/error.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/reader.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/serializer.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/string_record.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/tutorial.rs /home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/writer.rs
+
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/lib.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/byte_record.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/cookbook.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/debug.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/deserializer.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/error.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/reader.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/serializer.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/string_record.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/tutorial.rs:
+/home/dylan/.cargo/registry/src/index.crates.io-6f17d22bba15001f/csv-1.3.0/src/writer.rs:

@@ -7,13 +7,11 @@ use std::process::Command;
 use std::thread;
 // Use these for timing
 use std::time::SystemTime;
-
 use csv::Writer;
 use memmap2::MmapOptions;
 use rand::prelude::*;
 
 const EQUALS: u8 = 61;
-const SPACE: u8 = 32;
 const NEWLINE: u8 = 10;
 const POUND: u8 = 35;
 
@@ -376,22 +374,35 @@ fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u
     let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
-    return if interaction < absorption {
-        (false, neutron_energy, 0.0)
-    } else if interaction < in_scatter {
-        (
+    return match interaction {
+        x if x >= 0.0 && x < absorption => (false, neutron_energy, 0.0),
+        x if x >= absorption && x < in_scatter => (
             true,
             neutron_energy,
             2.0 * (random::<f64>()) - 1.0,
-        )
-    } else {
-        //down scatter
-        (
+        ),
+        _ => (
             true,
             neutron_energy + 1,
             2.0 * (random::<f64>()) - 1.0,
         )
     };
+    // return if interaction < absorption {
+    //     (false, neutron_energy, 0.0)
+    // } else if interaction < in_scatter {
+    //     (
+    //         true,
+    //         neutron_energy,
+    //         2.0 * (random::<f64>()) - 1.0,
+    //     )
+    // } else {
+    //     //down scatter
+    //     (
+    //         true,
+    //         neutron_energy + 1,
+    //         2.0 * (random::<f64>()) - 1.0,
+    //     )
+    // };
 }
 
 fn particle_travel(
