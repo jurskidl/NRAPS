@@ -121,7 +121,8 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
                     hash.entry(key)
                         .and_modify(|existing| *existing = existing.to_owned() + " " + &value) // I don't know why this works but the gods have smiled upon me
                         .or_insert(value);
-                } else {}
+                } else {
+                }
                 line_start = pos + 1;
             }
             _ => {}
@@ -412,12 +413,9 @@ fn particle_travel(
     boundl: f64,
     xsdata: &XSData,
 ) -> (bool, Vec<Vec<f64>>, usize, f64, u8, f64) {
-    // determine particle travel length
-    let inv_sigtr =
-        xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
-    let s: f64 = -random::<f64>().ln() * inv_sigtr;
-    // sum this and divide by number of particles, should be mean free path
-    let mut delta_s: f64 = mu * s;
+    let mut delta_s: f64 = mu
+        * -random::<f64>().ln()
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
 
     let mut same_material = true;
     while same_material == true {
@@ -429,9 +427,7 @@ fn particle_travel(
         };
 
         if (mu < 0.0 && mesh_end > end_x && mesh_index == 0)
-            || (mu >= 0.0
-            && end_x > mesh_end
-            && mesh_index == meshid.len() - 1)
+            || (mu >= 0.0 && end_x > mesh_end && mesh_index == meshid.len() - 1)
         {
             // hit the boundary
             tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
@@ -476,7 +472,7 @@ fn particle_travel(
             delta_s = mu
                 * -random::<f64>().ln()
                 * xsdata.inv_sigtr
-                [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+                    [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
         }
     }
     (true, tally, mesh_index, mu, neutron_energy, start_x)
@@ -620,9 +616,9 @@ fn monte_carlo(
                 if x >= variables.skip {
                     let conversion: f64 = (3565e6 * k)
                         / (200e6
-                        * 1.602176634e-19
-                        * xsdata.nut[(0 + (variables.mattypes * 1)) as usize]
-                        * meshid[meshid.len() - 1].mesh_right);
+                            * 1.602176634e-19
+                            * xsdata.nut[(0 + (variables.mattypes * 1)) as usize]
+                            * meshid[meshid.len() - 1].mesh_right);
                     results.flux[energy][index] += flux * conversion * fund;
                     results.fission_source[index] += fission_source * fund;
                 }
