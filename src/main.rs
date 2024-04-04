@@ -7,6 +7,7 @@ use std::process::Command;
 use std::thread;
 // Use these for timing
 use std::time::SystemTime;
+
 use csv::Writer;
 use memmap2::MmapOptions;
 use rand::prelude::*;
@@ -375,17 +376,11 @@ fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u
     let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
     return match interaction {
-        x if x >= 0.0 && x < absorption => (false, neutron_energy, 0.0),
-        x if x >= absorption && x < in_scatter => (
-            true,
-            neutron_energy,
-            2.0 * (random::<f64>()) - 1.0,
-        ),
-        _ => (
-            true,
-            neutron_energy + 1,
-            2.0 * (random::<f64>()) - 1.0,
-        )
+        x if x < absorption => (false, neutron_energy, 0.0),
+        x if x >= absorption && x < in_scatter => {
+            (true, neutron_energy, 2.0 * (random::<f64>()) - 1.0)
+        }
+        _ => (true, neutron_energy + 1, 2.0 * (random::<f64>()) - 1.0),
     };
     // return if interaction < absorption {
     //     (false, neutron_energy, 0.0)
@@ -433,26 +428,19 @@ fn particle_travel(
             meshid[mesh_index].mesh_left
         };
 
-        if (mu < 0.0 && (mesh_end - start_x) > (end_x - start_x) && mesh_index == 0)
+        if (mu < 0.0 && mesh_end > end_x && mesh_index == 0)
             || (mu >= 0.0
-            && (end_x - start_x) > (mesh_end - start_x)
+            && end_x > mesh_end
             && mesh_index == meshid.len() - 1)
         {
             // hit the boundary
             tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
             let bound = if mu >= 0.0 { boundr } else { boundl };
-            
+
             if bound > 0.0 {
                 (mu, delta_s, start_x) = hit_boundary(mu, start_x, delta_s, bound, mesh_end);
             } else {
-                return (
-                    false,
-                    tally,
-                    mesh_index,
-                    mu,
-                    neutron_energy,
-                    start_x,
-                );
+                return (false, tally, mesh_index, mu, neutron_energy, start_x);
             }
         } else if (end_x - start_x).abs() > (mesh_end - start_x).abs() {
             // cross mesh boundary
@@ -541,7 +529,11 @@ fn average_assembly(mut results: SolutionResults, numass: u8, energygroups: u8) 
     let mesh_assembly = results.flux[0].len() / numass as usize;
     for energy in 0..energygroups as usize {
         for assembly in 1..=numass as usize {
-            let average_ass: f64 = (((assembly - 1) * mesh_assembly)..(assembly * mesh_assembly)).into_iter().map(|x| results.flux[energy][x]).sum::<f64>() / mesh_assembly as f64;
+            let average_ass: f64 = (((assembly - 1) * mesh_assembly)..(assembly * mesh_assembly))
+                .into_iter()
+                .map(|x| results.flux[energy][x])
+                .sum::<f64>()
+                / mesh_assembly as f64;
             for index in ((assembly - 1) * mesh_assembly)..(assembly * mesh_assembly) {
                 results.assembly_average[energy][index] = average_ass;
             }
@@ -627,7 +619,10 @@ fn monte_carlo(
                 k_new += k * delta_x * fission_source;
                 if x >= variables.skip {
                     let conversion: f64 = (3565e6 * k)
-                        / (200e6 * 1.602176634e-19 * xsdata.nut[(0 + (variables.mattypes * 1)) as usize] * meshid[meshid.len() - 1].mesh_right);
+                        / (200e6
+                        * 1.602176634e-19
+                        * xsdata.nut[(0 + (variables.mattypes * 1)) as usize]
+                        * meshid[meshid.len() - 1].mesh_right);
                     results.flux[energy][index] += flux * conversion * fund;
                     results.fission_source[index] += fission_source * fund;
                 }

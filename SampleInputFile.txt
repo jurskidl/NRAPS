@@ -5,7 +5,7 @@
 #                                                                                       #
 #=======================================================================================#
 # Input file for the Finite Difference Diffusion Solver (FDDS)                          #
-# Inputs are case sensitive.                                                            #
+# Inputs are not case sensitive.                                                        #
 #                                                                                       #
 # Solution = method for solving the problem.                                            #
 #        0 = Finite difference solution method. (Default)                               #
@@ -26,13 +26,13 @@ EnergyGroups = 2
 #       1 = Gaussian Elimination                                                        #
 #       2 = Jacobi                                                                      #
 #       3 = SOR                                                                         #
-solver   = 3
+solver = 3
 
 # Generations = The number of generations to be simulated with the Monte Carlo Method.  #
 # Histories   = The number of histories per generation to be simulated with the Monte   #
 #               Carlo method.                                                           #
 Generations = 100
-Histories = 1000000
+Histories = 10000
 Skip = 1
 
 # NumRods  = Number of unit cells to be used in this problem.  A unit cell includes both#
