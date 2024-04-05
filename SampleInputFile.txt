@@ -25,7 +25,7 @@ EnergyGroups = 2
 #       0 = np.linalg.solve (Default)                                                   #
 #       1 = Gaussian Elimination                                                        #
 #       2 = Jacobi                                                                      #
-#       3 = SOR                                                                         #
+#       3 = SR                                                                         #
 solver = 3
 
 # Generations = The number of generations to be simulated with the Monte Carlo Method.  #

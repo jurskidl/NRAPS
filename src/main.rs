@@ -6,25 +6,25 @@ use std::time::SystemTime;
 
 use csv::Writer;
 
+use crate::discrete::{jacobi, succ_rel};
 use crate::mc_code::monte_carlo;
 use crate::process_input::process_input;
 
-mod process_input;
+mod discrete;
 mod mc_code;
-
+mod process_input;
 
 pub enum Solver {
     LinAlg,
     Gaussian,
     Jacobian,
-    Sor,
+    SR,
 }
 
 struct Variables {
     analk: u8,
     mattypes: u8,
     energygroups: u8,
-    solver: Solver,
     generations: usize,
     histories: usize,
     skip: usize,
@@ -189,13 +189,29 @@ fn plot_solution(
 fn main() {
     let now = SystemTime::now();
 
-    let (variables, xsdata, matid, deltax, solution) = process_input();
+    let (variables, xsdata, matid, deltax, solution, solver) = process_input();
 
     let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    let results = match solution {
-        1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-        _ => SolutionResults {
+    let results = match (solution, solver) {
+        (1, _) => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+        (_, Solver::Jacobian) => jacobi(
+            &xsdata,
+            &meshid,
+            variables.energygroups,
+            variables.mattypes,
+            variables.boundl,
+            variables.boundr,
+        ),
+        (_, Solver::SR) => succ_rel(
+            &xsdata,
+            &meshid,
+            variables.energygroups,
+            variables.mattypes,
+            variables.boundl,
+            variables.boundr,
+        ),
+        (_, _) => SolutionResults {
             flux: Vec::new(),
             assembly_average: Vec::new(),
             fission_source: Vec::new(),

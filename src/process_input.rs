@@ -72,7 +72,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
     hash
 }
 
-pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
+pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
     let file = File::open("./SampleInputFile.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
@@ -113,12 +113,6 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
         analk: hash.get("analk").unwrap().trim().parse().unwrap(),
         mattypes: hash.get("mattypes").unwrap().trim().parse().unwrap(),
         energygroups: hash.get("energygroups").unwrap().trim().parse().unwrap(),
-        solver: match hash.get("solver").unwrap().trim() {
-            "1" => Solver::Gaussian,
-            "2" => Solver::Jacobian,
-            "3" => Solver::Sor,
-            _ => Solver::LinAlg,
-        },
         generations: hash.get("generations").unwrap().trim().parse().unwrap(),
         histories: hash.get("histories").unwrap().trim().parse().unwrap(),
         skip: hash.get("skip").unwrap().trim().parse().unwrap(),
@@ -196,5 +190,11 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8) {
         matid,
         deltax,
         hash.get("solution").unwrap().trim().parse().unwrap(),
+        match hash.get("solver").unwrap().trim() {
+            "1" => Solver::Gaussian,
+            "2" => Solver::Jacobian,
+            "3" => Solver::SR,
+            _ => Solver::LinAlg,
+        },
     )
 }
