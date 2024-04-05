@@ -86,6 +86,23 @@ fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u
     // };
 }
 
+fn particle_travel_new(xsdata: &XSData, meshid: &Vec<Mesh>,mattypes: u8, neutron_energy: u8, mu: f64, mesh_index: usize) {
+    // Assign particle movement
+    let mut delta_s: f64 = mu
+        * -random::<f64>().ln()
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let same_material = true;
+    while same_material == true {
+        let end_x = start_x + delta_s;
+        let mesh_end = match mu {
+            x if x >= 0.0 => meshid[mesh_index].mesh_right,
+            _ => meshid[mesh_index].mesh_left,
+        };
+
+        // match statement to determine interaction time
+    }
+}
+
 fn particle_travel(
     mut tally: Vec<Vec<f64>>,
     meshid: &Vec<Mesh>,
