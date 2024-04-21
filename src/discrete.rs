@@ -1,3 +1,5 @@
+use rand::seq::index;
+
 use crate::{Mesh, SolutionResults, XSData};
 
 fn matrix_gen(
@@ -135,26 +137,26 @@ pub fn succ_rel(
 ) -> SolutionResults {
     let n: usize = meshid.len();
     let mut flux: Vec<Vec<f64>> = vec![vec![1.0; n]; energygroups as usize];
+    let mut q: Vec<Vec<f64>> = vec![vec![1.0; n]; energygroups as usize];
     for neutron_energy in 0..=energygroups as usize {
         let a = matrix_gen(n, xsdata, meshid, neutron_energy, mattypes, boundl, boundr);
-        let q = 1.0;
         let mut delta = 1.0;
 
         while delta >= 1e-5 {
-            let temp = (1.0 / a[0][0]) * (q - a[0][1] * flux[neutron_energy][1]);
+            let temp = (1.0 / a[0][0]) * (q[neutron_energy][0] - a[0][1] * flux[neutron_energy][1]);
             delta = (flux[neutron_energy][0] - temp).abs();
             flux[neutron_energy][0] = temp;
 
             for index in 1..n - 1 {
                 let temp = (1.0 / a[index][index])
-                    * (q - a[index - 1][index] * flux[neutron_energy][index - 1]
+                    * (q[neutron_energy][index] - a[index - 1][index] * flux[neutron_energy][index - 1]
                     - a[index][index + 1] * flux[neutron_energy][index + 1]);
                 delta = (flux[neutron_energy][index] - temp).abs().max(delta);
                 flux[neutron_energy][index] = temp;
             }
 
             let temp =
-                (1.0 / a[n - 1][n - 1]) * (q - a[n - 2][n - 1] * flux[neutron_energy][n - 2]);
+                (1.0 / a[n - 1][n - 1]) * (q[neutron_energy][n-1] - a[n - 2][n - 1] * flux[neutron_energy][n - 2]);
             delta = (flux[neutron_energy][n - 1] - temp).abs().max(delta);
             flux[neutron_energy][n - 1] = temp;
         }
