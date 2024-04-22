@@ -85,6 +85,19 @@ fn matrix_gen(
     a
 }
 
+fn q_gen(xsdata: &XSData, energygroups: u8, mattypes: u8, flux: &Vec<Vec<f64>>, meshid: &Vec<Mesh>) -> Vec<Vec<f64>> {
+    let mut q: Vec<Vec<f64>> = vec![vec![0.0; meshid.len()]; energygroups as usize];
+    for neutron_energy in 0..energygroups as usize {
+        for index in 0..meshid.len(){
+            q[neutron_energy][index] = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+                * xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+                * flux[neutron_energy][index] 
+                * meshid[index].delta_x;
+        }
+    }
+    q
+}
+
 pub fn jacobi(
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
@@ -94,35 +107,56 @@ pub fn jacobi(
     boundr: f64,
 ) -> SolutionResults {
     let n: usize = meshid.len();
-    let mut flux: Vec<Vec<f64>> = vec![vec![1.0; n]; energygroups as usize];
-    for neutron_energy in 0..=energygroups as usize {
-        let a = matrix_gen(n, xsdata, meshid, neutron_energy, mattypes, boundl, boundr);
-        let q = 1.0;
-        let mut delta = 1.0;
+    let mut flux: Vec<Vec<f64>> = vec![vec![1000.0; n]; energygroups as usize];
+    let mut q: Vec<Vec<f64>> = q_gen(xsdata, energygroups, mattypes, &flux, meshid);
+    let (mut k, mut delta_flux, mut delta_k): (f64, f64, f64) = (1.0, 1.0, 1.0);
 
-        while delta >= 1e-5 {
-            let mut temp: Vec<f64> = vec![0.0; n];
-            temp[0] = (1.0 / a[0][0]) * (q - a[0][1] * flux[neutron_energy][1]);
-            delta = (flux[neutron_energy][0] - temp[0]).abs();
+    while delta_flux >= 1e-5 && delta_k >= 1e-6 {
+        let temp_q = q.clone();
+
+        for neutron_energy in 0..energygroups as usize {
+            let a = matrix_gen(n, xsdata, meshid, neutron_energy, mattypes, boundl, boundr);
+        
+            let mut temp_flux: Vec<f64> = vec![0.0; n];
+            temp_flux[0] = (1.0/k) * (1.0 / a[0][0]) * (q[neutron_energy][0] - a[0][1] * temp_flux[1]);
+            delta_flux = (temp_flux[0] - temp_flux[0]).abs();
+            q[neutron_energy][0] = xsdata.nut[meshid[0].matid as usize + (mattypes as usize * neutron_energy)] 
+                * xsdata.sigf[meshid[0].matid as usize + (mattypes as usize * neutron_energy)] 
+                * temp_flux[0] 
+                * meshid[0].delta_x;
 
             for index in 1..n - 1 {
-                temp[index] = (1.0 / a[index][index])
-                    * (q - a[index - 1][index] * flux[neutron_energy][index - 1]
+                temp_flux[index] = (1.0/k)
+                    * (1.0 / a[index][index])
+                    * (q[neutron_energy][index] - a[index - 1][index] * flux[neutron_energy][index - 1]
                     - a[index][index + 1] * flux[neutron_energy][index + 1]);
-                delta = (flux[neutron_energy][index] - temp[index]).abs().max(delta);
+                delta_flux = (flux[neutron_energy][index] - temp_flux[index]).abs().max(delta_flux);
+                q[neutron_energy][index] = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+                    * xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+                    * temp_flux[index] 
+                    * meshid[index].delta_x;
             }
 
-            temp[n - 1] =
-                (1.0 / a[n - 1][n - 1]) * (q - a[n - 2][n - 1] * flux[neutron_energy][n - 2]);
-            delta = (flux[neutron_energy][n - 1] - temp[n - 1]).abs().max(delta);
-            flux[neutron_energy] = temp;
+            temp_flux[n - 1] =( 1.0/k) * 
+            (1.0 / a[n - 1][n - 1]) * (q[neutron_energy][n-1] - a[n - 2][n - 1] * flux[neutron_energy][n - 2]);
+            delta_flux = (flux[neutron_energy][n - 1] - temp_flux[n - 1]).abs().max(delta_flux);
+            q[neutron_energy][n - 1] = xsdata.nut[meshid[n - 1].matid as usize + (mattypes as usize * neutron_energy)] 
+                * xsdata.sigf[meshid[n - 1].matid as usize + (mattypes as usize * neutron_energy)] 
+                * temp_flux[n - 1] 
+                * meshid[n - 1].delta_x;
+            flux[neutron_energy] = temp_flux;
         }
+        let temp_k = k;
+        k = temp_k * (q.iter().flatten().sum::<f64>()/temp_q.iter().flatten().sum::<f64>());
+        delta_k = ((k - temp_k)/temp_k).abs();
+
+        println!("{}", k);
     }
     SolutionResults {
         flux,
         assembly_average: Vec::new(),
         fission_source: Vec::new(),
-        k: Vec::new(),
+        k: vec![k],
         k_fund: Vec::new(),
     }
 }
@@ -136,37 +170,58 @@ pub fn succ_rel(
     boundr: f64,
 ) -> SolutionResults {
     let n: usize = meshid.len();
-    let mut flux: Vec<Vec<f64>> = vec![vec![1.0; n]; energygroups as usize];
-    let mut q: Vec<Vec<f64>> = vec![vec![1.0; n]; energygroups as usize];
-    for neutron_energy in 0..=energygroups as usize {
-        let a = matrix_gen(n, xsdata, meshid, neutron_energy, mattypes, boundl, boundr);
-        let mut delta = 1.0;
+    let mut flux: Vec<Vec<f64>> = vec![vec![1000.0; n]; energygroups as usize];
+    let mut q: Vec<Vec<f64>> = q_gen(xsdata, energygroups, mattypes, &flux, meshid);
+    let (mut k, mut delta_flux, mut delta_k): (f64, f64, f64) = (1.0, 1.0, 1.0);
+    
+    while delta_flux >= 1e-5 && delta_k >= 1e-6 {
+        let temp_q = q.clone();
 
-        while delta >= 1e-5 {
-            let temp = (1.0 / a[0][0]) * (q[neutron_energy][0] - a[0][1] * flux[neutron_energy][1]);
-            delta = (flux[neutron_energy][0] - temp).abs();
-            flux[neutron_energy][0] = temp;
+        for neutron_energy in 0..energygroups as usize {
+            let a = matrix_gen(n, xsdata, meshid, neutron_energy, mattypes, boundl, boundr);
+            let temp_flux = (1.0/k) * (1.0 / a[0][0]) * (q[neutron_energy][0] - a[0][1] * flux[neutron_energy][1]);
+            delta_flux = ((flux[neutron_energy][0] - temp_flux)/flux[neutron_energy][0]).abs();
+            flux[neutron_energy][0] = temp_flux;
+            q[neutron_energy][0] = xsdata.nut[meshid[0].matid as usize + (mattypes as usize * neutron_energy)] 
+                * xsdata.sigf[meshid[0].matid as usize + (mattypes as usize * neutron_energy)] 
+                * flux[neutron_energy][0] 
+                * meshid[0].delta_x;
 
             for index in 1..n - 1 {
-                let temp = (1.0 / a[index][index])
+                let temp = (1.0/k)
+                    * (1.0 / a[index][index])
                     * (q[neutron_energy][index] - a[index - 1][index] * flux[neutron_energy][index - 1]
                     - a[index][index + 1] * flux[neutron_energy][index + 1]);
-                delta = (flux[neutron_energy][index] - temp).abs().max(delta);
+                delta_flux = ((flux[neutron_energy][index] - temp)/flux[neutron_energy][index]).abs().max(delta_flux);
                 flux[neutron_energy][index] = temp;
+                q[neutron_energy][index] = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+                    * xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+                    * flux[neutron_energy][index] 
+                    * meshid[index].delta_x;
             }
 
-            let temp =
+            let temp = (1.0/k) * 
                 (1.0 / a[n - 1][n - 1]) * (q[neutron_energy][n-1] - a[n - 2][n - 1] * flux[neutron_energy][n - 2]);
-            delta = (flux[neutron_energy][n - 1] - temp).abs().max(delta);
+            delta_flux = ((flux[neutron_energy][n - 1] - temp)/flux[neutron_energy][n - 1]).abs().max(delta_flux);
             flux[neutron_energy][n - 1] = temp;
+            q[neutron_energy][n - 1] = xsdata.nut[meshid[n - 1].matid as usize + (mattypes as usize * neutron_energy)] 
+                * xsdata.sigf[meshid[n - 1].matid as usize + (mattypes as usize * neutron_energy)] 
+                * flux[neutron_energy][n - 1] 
+                * meshid[n - 1].delta_x;
         }
+        
+        let temp_k = k;
+        k = temp_k * (q.iter().flatten().sum::<f64>()/temp_q.iter().flatten().sum::<f64>());
+        delta_k = ((k - temp_k)/temp_k).abs();
+
+        println!("{}", k);
     }
 
     SolutionResults {
         flux,
         assembly_average: Vec::new(),
         fission_source: Vec::new(),
-        k: Vec::new(),
+        k: vec![k],
         k_fund: Vec::new(),
     }
 }

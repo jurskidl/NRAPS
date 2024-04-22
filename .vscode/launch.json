@@ -10,7 +10,7 @@
             "type": "lldb",
             "request": "launch",
             "name": "Debug",
-            "program": "${workspaceFolder}/target/debug/nraps.exe",
+            "program": "${workspaceFolder}/target/debug/nraps",
             "args": [],
             "cwd": "${workspaceRoot}/target/debug/"
         }
