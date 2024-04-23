@@ -44,7 +44,7 @@ Skip = 1
 #            however, if you enter an odd number, the code will make it even by adding  #
 #            1 to the value entered.                                                    #
 NumAss   = 2
-NumRods  = 17
+NumRods  = 2
 RodDia   = 0.94
 RodPitch = 1.262
 MPFR = 8
@@ -81,6 +81,6 @@ ConfigSets
     #      start with 0.  Material id corresponds with the material location above.     #
     #      NOTE: this should be changed to allow for assembly wise input.               #
     #      UO2 = 0, MOX = 1, H2O = 2, CR = 3                                            #
-    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
-    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
+    MatID = 2 0 2 0 2
+    MatID = 2 0 2 0 2
 END

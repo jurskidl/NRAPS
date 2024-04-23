@@ -1,5 +1,3 @@
-use rand::seq::index;
-
 use crate::{Mesh, SolutionResults, XSData};
 
 fn matrix_gen(
@@ -89,10 +87,13 @@ fn q_gen(xsdata: &XSData, energygroups: u8, mattypes: u8, flux: &Vec<Vec<f64>>, 
     let mut q: Vec<Vec<f64>> = vec![vec![0.0; meshid.len()]; energygroups as usize];
     for neutron_energy in 0..energygroups as usize {
         for index in 0..meshid.len(){
-            q[neutron_energy][index] = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
-                * xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)] 
+            let nut = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)];
+            let sigf = xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)];
+            let deltax = meshid[index].delta_x;
+            q[neutron_energy][index] = nut
+                *  sigf
                 * flux[neutron_energy][index] 
-                * meshid[index].delta_x;
+                * deltax;
         }
     }
     q
