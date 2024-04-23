@@ -32,8 +32,8 @@ solver   = 3
 # Histories   = The number of histories per generation to be simulated with the Monte   #
 #               Carlo method.                                                           #
 Generations = 100
-Histories = 1000
-Skip = 1
+Histories = 50000000
+Skip = 4
 
 # NumRods  = Number of unit cells to be used in this problem.  A unit cell includes both#
 #           the fuel rod and half of the gap between itself and the next fuel rod.      #
@@ -47,8 +47,8 @@ NumAss   = 2
 NumRods  = 17
 RodDia   = 0.94
 RodPitch = 1.262
-MPFR = 20
-MPWR = 8
+MPFR = 200
+MPWR = 200
 
 # You have to specify the boundary conditions after you set the number of energy groups #
 # BoundL  = Left Boundary Condition                                                     #
