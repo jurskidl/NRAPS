@@ -32,8 +32,12 @@ fn matrix_gen(
 
     // Insert 0,0 and n,n since these differ from the pattern
     a[0][0] = 2.0 * d_curr * (1.0 - beta_l)
-        + meshid[0].delta_x * xsdata.siga[(meshid[0].matid + (mattypes * neutron_energy as u8)) as usize]
+        + meshid[0].delta_x 
+        * (xsdata.inv_sigtr[(meshid[0].matid + (mattypes * neutron_energy as u8)) as usize].powi(-1) 
+        - xsdata.sigis[(meshid[0].matid + (mattypes * neutron_energy as u8)) as usize])
         + d_nextcurr;
+
+    a[1][0] = -d_nextcurr;
 
     for x in 1..n - 1 {
         let d_curr: f64 = 3.0_f64.powi(-1)
@@ -51,10 +55,11 @@ fn matrix_gen(
 
         a[x - 1][x] = -d_prevcurr;
         a[x][x] = d_prevcurr
-            + d_nextcurr
             + meshid[x].delta_x
-            * xsdata.siga[(meshid[x].matid + (mattypes * neutron_energy as u8)) as usize];
-        a[x][x + 1] = -d_nextcurr;
+            * (xsdata.inv_sigtr[(meshid[x].matid + (mattypes * neutron_energy as u8)) as usize].powi(-1) 
+            - xsdata.sigis[(meshid[x].matid + (mattypes * neutron_energy as u8)) as usize])
+            + d_nextcurr;
+        a[x + 1][x] = -d_nextcurr;
     }
 
     // Set values for end insertion
@@ -76,10 +81,12 @@ fn matrix_gen(
         }
     };
 
+    a[n - 2][n - 1] = -d_prevcurr;
     a[n - 1][n - 1] = 2.0 * d_curr * (1.0 - beta_r)
-        + meshid[n - 1].delta_x
-        * xsdata.siga[(meshid[n - 1].matid + (mattypes * neutron_energy as u8)) as usize]
-        + d_prevcurr;
+        + meshid[n - 1].delta_x 
+        * (xsdata.inv_sigtr[(meshid[n - 1].matid + (mattypes * neutron_energy as u8)) as usize].powi(-1) 
+        - xsdata.sigis[(meshid[n - 1].matid + (mattypes * neutron_energy as u8)) as usize])
+        + d_nextcurr;
     a
 }
 
@@ -87,13 +94,10 @@ fn q_gen(xsdata: &XSData, energygroups: u8, mattypes: u8, flux: &Vec<Vec<f64>>, 
     let mut q: Vec<Vec<f64>> = vec![vec![0.0; meshid.len()]; energygroups as usize];
     for neutron_energy in 0..energygroups as usize {
         for index in 0..meshid.len(){
-            let nut = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)];
-            let sigf = xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)];
-            let deltax = meshid[index].delta_x;
-            q[neutron_energy][index] = nut
-                *  sigf
+            q[neutron_energy][index] = xsdata.nut[meshid[index].matid as usize + (mattypes as usize * neutron_energy)]
+                *  xsdata.sigf[meshid[index].matid as usize + (mattypes as usize * neutron_energy)]
                 * flux[neutron_energy][index] 
-                * deltax;
+                * meshid[index].delta_x;
         }
     }
     q
