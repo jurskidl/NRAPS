@@ -26,7 +26,7 @@ EnergyGroups = 2
 #       1 = Gaussian Elimination                                                        #
 #       2 = Jacobi                                                                      #
 #       3 = SR                                                                         #
-solver = 3
+solver = 0
 
 # Generations = The number of generations to be simulated with the Monte Carlo Method.  #
 # Histories   = The number of histories per generation to be simulated with the Monte   #
@@ -44,10 +44,10 @@ Skip = 4
 #            however, if you enter an odd number, the code will make it even by adding  #
 #            1 to the value entered.                                                    #
 NumAss   = 2
-NumRods  = 2
+NumRods  = 17
 RodDia   = 0.94
 RodPitch = 1.262
-MPFR = 8
+MPFR = 6
 MPWR = 4
 
 # You have to specify the boundary conditions after you set the number of energy groups #

@@ -3,10 +3,9 @@ use std::iter::repeat;
 use std::process::Command;
 // Use these for timing
 use std::time::SystemTime;
-
 use csv::Writer;
 
-use crate::discrete::{jacobi, succ_rel};
+use crate::discrete::{jacobi, nalgebra_method, succ_rel};
 use crate::mc_code::monte_carlo;
 use crate::process_input::process_input;
 
@@ -195,6 +194,14 @@ fn main() {
 
     let results = match (solution, solver) {
         (1, _) => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+        (_, Solver::LinAlg) => nalgebra_method(
+            &xsdata,
+            &meshid,
+            variables.energygroups,
+            variables.mattypes,
+            variables.boundl,
+            variables.boundr,
+        ),
         (_, Solver::Jacobian) => jacobi(
             &xsdata,
             &meshid,
