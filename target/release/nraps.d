@@ -1,1 +1,1 @@
-/home/dylan/GitHub/NRAPS/target/release/nraps: /home/dylan/GitHub/NRAPS/src/discrete.rs /home/dylan/GitHub/NRAPS/src/main.rs /home/dylan/GitHub/NRAPS/src/mc_code.rs /home/dylan/GitHub/NRAPS/src/process_input.rs
+/home/dylanjurski/Documents/GitHub/NRAPS/target/release/nraps: /home/dylanjurski/Documents/GitHub/NRAPS/src/discrete.rs /home/dylanjurski/Documents/GitHub/NRAPS/src/main.rs /home/dylanjurski/Documents/GitHub/NRAPS/src/mc_code.rs /home/dylanjurski/Documents/GitHub/NRAPS/src/process_input.rs
