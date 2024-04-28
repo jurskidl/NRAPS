@@ -60,12 +60,12 @@ fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u
     let interaction: f64 = random();
     let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
     let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
-    let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
+    // let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
     return match interaction {
         x if x < absorption => (false, neutron_energy, 0.0),
-        x if x >= absorption && x < in_scatter => {
-            (true, neutron_energy, 2.0 * (random::<f64>()) - 1.0)
-        }
+        // x if x >= absorption && x < in_scatter => {
+        //     (true, neutron_energy, 2.0 * (random::<f64>()) - 1.0)
+        // }
         _ => (true, neutron_energy + 1, 2.0 * (random::<f64>()) - 1.0),
     };
     // return if interaction < absorption {

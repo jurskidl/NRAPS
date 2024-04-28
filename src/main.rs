@@ -2,7 +2,7 @@ use std::iter::repeat;
 // Use these for timing
 use std::time::SystemTime;
 
-use crate::discrete::{jacobi, nalgebra_method, succ_rel};
+use crate::discrete::nalgebra_method;
 use crate::mc_code::monte_carlo;
 use crate::process_input::process_input;
 use crate::plot_solution::plot_solution;
@@ -10,6 +10,7 @@ use crate::plot_solution::plot_solution;
 mod discrete;
 mod mc_code;
 mod process_input;
+mod plot_solution;
 
 pub enum Solver {
     LinAlg,
@@ -41,13 +42,15 @@ struct DeltaX {
 }
 
 struct XSData {
-    inv_sigtr: Vec<f64>,
-    sigis: Vec<f64>,
-    sigds: Vec<f64>,
+    sigt: Vec<f64>,
+    sigs: Vec<f64>,
+    mu: Vec<f64>,
     siga: Vec<f64>,
     sigf: Vec<f64>,
     nut: Vec<f64>,
     chit: Vec<f64>,
+    scat_matrix: Vec<f64>,
+    inv_sigtr: Vec<f64>,
 }
 
 struct Mesh {
@@ -143,22 +146,22 @@ fn main() {
             variables.boundr,
             variables.numass,
         ),
-        (_, Solver::Jacobian) => jacobi(
-            &xsdata,
-            &meshid,
-            variables.energygroups,
-            variables.mattypes,
-            variables.boundl,
-            variables.boundr,
-        ),
-        (_, Solver::SR) => succ_rel(
-            &xsdata,
-            &meshid,
-            variables.energygroups,
-            variables.mattypes,
-            variables.boundl,
-            variables.boundr,
-        ),
+        // (_, Solver::Jacobian) => jacobi(
+        //     &xsdata,
+        //     &meshid,
+        //     variables.energygroups,
+        //     variables.mattypes,
+        //     variables.boundl,
+        //     variables.boundr,
+        // ),
+        // (_, Solver::SR) => succ_rel(
+        //     &xsdata,
+        //     &meshid,
+        //     variables.energygroups,
+        //     variables.mattypes,
+        //     variables.boundl,
+        //     variables.boundr,
+        // ),
         (_, _) => SolutionResults {
             flux: Vec::new(),
             assembly_average: Vec::new(),

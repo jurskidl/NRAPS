@@ -1,0 +1,99 @@
+#=======================================================================================#
+#                                                                                       #
+# Main input data.  This input controls the program execution and sets general problem  #
+# geometry. This should be the first set of inputs.                                     #
+#                                                                                       #
+#=======================================================================================#
+# Input file for the Finite Difference Diffusion Solver (FDDS)                          #
+# Inputs are not case sensitive.                                                        #
+#                                                                                       #
+# Solution = method for solving the problem.                                            #
+#        0 = Finite difference solution method. (Default)                               #
+#        1 = Monte Carlo solution method.                                               #
+# Analk    = Calculate the analytic multiplication factor.                              #
+Solution = 0
+Analk = 1
+
+# MatTypes = The total number of different material types for cross section data to be  #
+#            entered.                                                                   #
+# EnergyGroups = The total number of different energy groups in the problem.            #
+MatTypes = 4
+EnergyGroups = 2
+
+# solver  = The specific solver to be used for this calculation. Only needed for finite #
+#           difference method.                                                          #
+#       0 = np.linalg.solve (Default)                                                   #
+#       1 = Gaussian Elimination                                                        #
+#       2 = Jacobi                                                                      #
+#       3 = SR                                                                         #
+solver = 0
+
+# Generations = The number of generations to be simulated with the Monte Carlo Method.  #
+# Histories   = The number of histories per generation to be simulated with the Monte   #
+#               Carlo method.                                                           #
+Generations = 100
+Histories = 1000
+Skip = 4
+
+# NumRods  = Number of unit cells to be used in this problem.  A unit cell includes both#
+#           the fuel rod and half of the gap between itself and the next fuel rod.      #
+# RodDia   = Fuel rod diameter.                                                         #
+# RodPitch = Fuel rod pitch (i.e. center to center distance between fuel rods).         #
+# MPFR     = Number of Meshes Per Fuel Rod (MPFR).                                      #
+# MPWR     = Number of Meshes Per Water Rod (MPWR). MPWR should be an even number       #
+#            however, if you enter an odd number, the code will make it even by adding  #
+#            1 to the value entered.                                                    #
+NumAss   = 2
+NumRods  = 17
+RodDia   = 0.94
+RodPitch = 1.262
+MPFR = 20
+MPWR = 8
+
+# You have to specify the boundary conditions after you set the number of energy groups #
+# BoundL  = Left Boundary Condition                                                     #
+# BoundR  = Right Boundary Condition                                                    #
+BoundL = 1.0
+BoundR = 1.0
+
+#=======================================================================================#
+#                                                                                       #
+# Cross section data.  This has to be input after the main data above.                  #
+#                                                                                       #
+#=======================================================================================#
+
+XSData
+    #           Test Case A cross section data                                          #
+    #             Energy Group 1            Energy Group 2                              #
+    #        UO2    MOX    H2O   CR     UO2   MOX   H2O   CR                            #
+    #         0      1      2     3      0     1     2     3                            #
+    SigT  = 0.200  0.200  0.200  0.1    1.00  1.20  1.10  1.1
+    SigS  = 0.200  0.200  0.200  0.0    0.80  0.80  1.10  0.1
+    mu    = 0.000  0.000  0.000  0.0    0.00  0.00  0.00  0.0
+    SigA  = 0.000  0.000  0.000  0.1    0.20  0.40  0.00  1.0
+    SigF  = 0.000  0.000  0.000  0.0    0.18  0.30  0.00  0.0
+    nuT   = 0.000  0.000  0.000  0.0    1.40  1.50  0.00  0.0
+    ChiT  = 1.000  1.000  0.000  0.0    0.00  0.00  0.00  0.0
+
+#=======================================================================================#
+#                                                                                       #
+# Scattering Matrix.   This has to be input after the main data above.                  #
+#                                                                                       #
+#=======================================================================================#
+
+    #                       Test Case B cross section data                              #
+    #                            g -> g'                                                #
+    #     1 -> 1  1 - > 2         2 -> 1   2 -> 2                                       #
+    Scat = 0.185   0.015          0.000     0.80
+    Scat = 0.185   0.015          0.000     0.80
+    Scat = 0.170   0.030          0.000     1.10
+
+# Next add the different configurations.                                                #
+ConfigSets
+    # .... Define the material composition for each configuration. The set number       #
+    #      start with 0.  Material id corresponds with the material location above.     #
+    #      NOTE: this should be changed to allow for assembly wise input.               #
+    #      UO2 = 0, MOX = 1, H2O = 2, CR = 3                                            #
+    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
+    MatID = 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2 0 2
+END
