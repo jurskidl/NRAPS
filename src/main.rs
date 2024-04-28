@@ -10,6 +10,7 @@ use crate::plot_solution::plot_solution;
 mod discrete;
 mod mc_code;
 mod process_input;
+mod plot_solution;
 
 pub enum Solver {
     LinAlg,
