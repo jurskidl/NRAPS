@@ -3,10 +3,7 @@ use std::fs::File;
 
 use memmap2::MmapOptions;
 
-use crate::DeltaX;
-use crate::Solver;
-use crate::Variables;
-use crate::XSData;
+use crate::{DeltaX, Solver, Variables, XSData};
 
 const EQUALS: u8 = 61;
 const NEWLINE: u8 = 10;

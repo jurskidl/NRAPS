@@ -329,6 +329,8 @@ pub fn monte_carlo(
         results.k[x] = k_new;
     }
 
+    println!("{}", results.k[results.k.len() - 1]);
+
     results = average_assembly(results, variables.numass, variables.energygroups);
 
     results.k_fund[variables.skip] = results.k[variables.skip];
