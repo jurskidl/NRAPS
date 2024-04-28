@@ -183,11 +183,9 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
         inv_sigtr: Vec::new(),
     };
 
-    xsdata.inv_sigtr = xsdata.sigt.iter().map(|x| x.powi(-1)).collect();
-
-    // for index in 0..xsdata.sigt.len() {
-    //     xsdata.inv_sigtr.push((xsdata.sigt[index] - xsdata.mu[index] * xsdata.sigs[index]).powi(-1));
-    // }
+    for index in 0..xsdata.sigt.len() {
+        xsdata.inv_sigtr.push((xsdata.sigt[index] - xsdata.mu[index] * xsdata.sigs[index]).powi(-1));
+    }
 
     let matid: Vec<u8> = hash
         .get("matid")
