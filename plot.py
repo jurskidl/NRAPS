@@ -42,14 +42,11 @@ for line in open('interface.csv', 'r'):
 
 x = np.linspace(0.0, length, num=meshed)
 
-print(x)
-
-if k_fund:
-    plt.plot(k, 'o', markerfacecolor='none', label='multplication factor')
-    plt.plot(k_fund, color='orange')
-    plt.title('Multiplication Factor')
-    plt.xlim(0, generations)
-    plt.ylim(0, 2)
+plt.plot(k, 'o', markerfacecolor='none', label='multplication factor')
+plt.plot(k_fund, color='orange')
+plt.title('Multiplication Factor')
+plt.xlim(0, generations)
+plt.ylim(0, 2)
 
 # plt.show()
 plt.savefig('./k_eff.png', bbox_inches='tight')
