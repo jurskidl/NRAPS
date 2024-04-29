@@ -299,8 +299,6 @@ pub fn monte_carlo(
         results.k[x] = k_new;
     }
 
-    println!("{}", results.k[results.k.len() - 1]);
-
     results = average_assembly(results, variables.numass, variables.energygroups);
 
     results.k_fund[variables.skip] = results.k[variables.skip];
@@ -312,6 +310,7 @@ pub fn monte_carlo(
             .sum::<f64>()
             / (generations - (variables.skip - 1)) as f64;
     }
+    println!("{}", results.k_fund[results.k_fund.len() - 1]);
 
     results
 }

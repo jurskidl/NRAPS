@@ -146,22 +146,6 @@ fn main() {
             variables.boundr,
             variables.numass,
         ),
-        // (_, Solver::Jacobian) => jacobi(
-        //     &xsdata,
-        //     &meshid,
-        //     variables.energygroups,
-        //     variables.mattypes,
-        //     variables.boundl,
-        //     variables.boundr,
-        // ),
-        // (_, Solver::SR) => succ_rel(
-        //     &xsdata,
-        //     &meshid,
-        //     variables.energygroups,
-        //     variables.mattypes,
-        //     variables.boundl,
-        //     variables.boundr,
-        // ),
         (_, _) => SolutionResults {
             flux: Vec::new(),
             assembly_average: Vec::new(),
