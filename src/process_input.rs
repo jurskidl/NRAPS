@@ -70,7 +70,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
 }
 
 pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
-    let file = File::open("./SampleInputFile.txt").expect("Unable to read the file");
+    let file = File::open("./TestCaseA.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
     let end: usize = mapped_file.len();
@@ -130,21 +130,21 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
     };
 
     // index into vectors via desired_xs = sigtr[(mat# + (energygroup*mattypes) as usize]
-    let xsdata = XSData {
-        inv_sigtr: hash
-            .get("sigtr")
+    let mut xsdata = XSData {
+        sigt: hash
+            .get("sigt")
             .unwrap()
             .split_whitespace()
-            .map(|x| x.parse::<f64>().unwrap().powi(-1))
+            .map(|x| x.parse::<f64>().unwrap())
             .collect(),
-        sigis: hash
-            .get("sigis")
+        sigs: hash
+            .get("sigs")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        sigds: hash
-            .get("sigds")
+        mu: hash
+            .get("mu")
             .unwrap()
             .split_whitespace()
             .map(|x| x.parse().unwrap())
@@ -173,7 +173,19 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
+        // Index via [(mattype * energygroups) + ((energygroups * starting_energy) + final_energy)]
+        scat_matrix: hash
+            .get("scat")
+            .unwrap()
+            .split_whitespace()
+            .map(|x| x.parse().unwrap())
+            .collect(),
+        inv_sigtr: Vec::new(),
     };
+
+    for index in 0..xsdata.sigt.len() {
+        xsdata.inv_sigtr.push((xsdata.sigt[index] - xsdata.mu[index] * xsdata.sigs[index]).powi(-1));
+    }
 
     let matid: Vec<u8> = hash
         .get("matid")

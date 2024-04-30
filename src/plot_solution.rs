@@ -23,7 +23,7 @@ pub fn plot_solution(
     let mut output_average =
         vec![vec!["0.0".to_string(); results.assembly_average[0].len()]; energygroups as usize];
     for energy in 0..energygroups as usize {
-        for index in 0..results.assembly_average.len() {
+        for index in 0..results.assembly_average[0].len() {
             output_average[energy][index] = results.assembly_average[energy][index].to_string();
         }
     }
@@ -57,7 +57,7 @@ pub fn plot_solution(
     wtr.write_record(&output_fission)?;
     wtr.flush()?;
 
-    Command::new("python").arg("plot.py").spawn()?;
+    Command::new("python3").arg("plot.py").spawn().expect("Command Failed");
 
     Ok(())
 }

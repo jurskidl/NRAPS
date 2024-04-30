@@ -56,11 +56,15 @@ fn cross_mesh(
     (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
-fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u8, f64) {
+fn interaction(xsdata: &XSData, meshid: &Vec<Mesh>, mesh_index: usize, mattypes: u8, energygroups: u8, neutron_energy: u8) -> (bool, u8, f64) {
     let interaction: f64 = random();
-    let absorption: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
-    let fission: f64 = xsdata.siga[xs_index] * xsdata.inv_sigtr[xs_index];
-    let in_scatter: f64 = fission + (xsdata.sigis[xs_index] * xsdata.inv_sigtr[xs_index]);
+    let absorption: f64 = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize] 
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let fission: f64 = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize] 
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let in_scatter: f64 = fission 
+        + (xsdata.scat_matrix[(neutron_energy as u8 * (energygroups.pow(2) - 1) + (meshid[0].matid * energygroups.pow(2))) as usize] 
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize]);
     return match interaction {
         x if x < absorption => (false, neutron_energy, 0.0),
         x if x >= absorption && x < in_scatter => {
@@ -68,40 +72,7 @@ fn interaction(xsdata: &XSData, xs_index: usize, neutron_energy: u8) -> (bool, u
         }
         _ => (true, neutron_energy + 1, 2.0 * (random::<f64>()) - 1.0),
     };
-    // return if interaction < absorption {
-    //     (false, neutron_energy, 0.0)
-    // } else if interaction < in_scatter {
-    //     (
-    //         true,
-    //         neutron_energy,
-    //         2.0 * (random::<f64>()) - 1.0,
-    //     )
-    // } else {
-    //     //down scatter
-    //     (
-    //         true,
-    //         neutron_energy + 1,
-    //         2.0 * (random::<f64>()) - 1.0,
-    //     )
-    // };
 }
-
-// fn particle_travel_new(xsdata: &XSData, meshid: &Vec<Mesh>,mattypes: u8, neutron_energy: u8, mu: f64, mesh_index: usize) {
-//     // Assign particle movement
-//     let mut delta_s: f64 = mu
-//         * -random::<f64>().ln()
-//         * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
-//     let same_material = true;
-//     while same_material == true {
-//         let end_x = start_x + delta_s;
-//         let mesh_end = match mu {
-//             x if x >= 0.0 => meshid[mesh_index].mesh_right,
-//             _ => meshid[mesh_index].mesh_left,
-//         };
-
-//         // match statement to determine interaction time
-//     }
-// }
 
 fn particle_travel(
     mut tally: Vec<Vec<f64>>,
@@ -111,13 +82,14 @@ fn particle_travel(
     mut mu: f64,
     mut start_x: f64,
     mattypes: u8,
+    energygroups: u8,
     boundr: f64,
     boundl: f64,
     xsdata: &XSData,
 ) -> (bool, Vec<Vec<f64>>, usize, f64, u8, f64) {
     let mut delta_s: f64 = mu
         * -random::<f64>().ln()
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+        * xsdata.sigt[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize].powi(-1);
 
     let mut same_material = true;
     while same_material == true {
@@ -155,9 +127,8 @@ fn particle_travel(
             // interaction
             tally[neutron_energy as usize][mesh_index] += ((start_x - end_x) / mu).abs();
 
-            let xs_index: usize = (meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize;
             let (particle_exists, _neutron_energy, _mu) =
-                interaction(&xsdata, xs_index, neutron_energy);
+                interaction(&xsdata, meshid, mesh_index, mattypes, energygroups, neutron_energy);
             if particle_exists == false {
                 return (
                     particle_exists,
@@ -173,8 +144,7 @@ fn particle_travel(
             mu = _mu;
             delta_s = mu
                 * -random::<f64>().ln()
-                * xsdata.inv_sigtr
-                [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+                * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
         }
     }
     (true, tally, mesh_index, mu, neutron_energy, start_x)
@@ -214,6 +184,7 @@ fn particle_lifetime(
                 mu,
                 start_x,
                 variables.mattypes,
+                variables.energygroups,
                 variables.boundr,
                 variables.boundl,
                 xsdata,
@@ -248,7 +219,6 @@ pub fn monte_carlo(
     fuel_indices: &Vec<usize>,
     mut k_new: f64,
 ) -> SolutionResults {
-    // println!("running monte carlo code");
     let mut results = SolutionResults {
         flux: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
         assembly_average: vec![vec![0.0; meshid.len()]; variables.energygroups as usize],
@@ -329,8 +299,6 @@ pub fn monte_carlo(
         results.k[x] = k_new;
     }
 
-    println!("{}", results.k[results.k.len() - 1]);
-
     results = average_assembly(results, variables.numass, variables.energygroups);
 
     results.k_fund[variables.skip] = results.k[variables.skip];
@@ -342,6 +310,7 @@ pub fn monte_carlo(
             .sum::<f64>()
             / (generations - (variables.skip - 1)) as f64;
     }
+    println!("{}", results.k_fund[results.k_fund.len() - 1]);
 
     results
 }
