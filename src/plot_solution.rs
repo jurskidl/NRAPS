@@ -16,7 +16,7 @@ pub fn plot_solution(
     let mut output_flux =
         vec![vec!["0.0".to_string(); results.flux[0].len()]; energygroups as usize];
     for energy in 0..energygroups as usize {
-        for index in 0..results.fission_source.len() {
+        for index in 0..results.flux[0].len() {
             output_flux[energy][index] = results.flux[energy][index].to_string();
         }
     }
@@ -40,12 +40,6 @@ pub fn plot_solution(
     wtr_vars.write_record([&generations.to_string()])?;
     wtr_vars.flush()?;
 
-    let mut wtr_k = Writer::from_path("./k_eff.csv")?;
-
-    wtr_k.write_record(&output_k)?;
-    wtr_k.write_record(&output_k_fund)?;
-    wtr_k.flush()?;
-
     let mut wtr = Writer::from_path("./interface.csv")?;
 
     for energy in 0..energygroups as usize {
@@ -56,6 +50,12 @@ pub fn plot_solution(
     }
     wtr.write_record(&output_fission)?;
     wtr.flush()?;
+
+    let mut wtr_k = Writer::from_path("./k_eff.csv")?;
+
+    wtr_k.write_record(&output_k)?;
+    wtr_k.write_record(&output_k_fund)?;
+    wtr_k.flush()?;
 
     Command::new("python3").arg("plot.py").spawn().expect("Command Failed");
 

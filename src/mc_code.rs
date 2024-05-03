@@ -59,18 +59,26 @@ fn cross_mesh(
 fn interaction(xsdata: &XSData, meshid: &Vec<Mesh>, mesh_index: usize, mattypes: u8, energygroups: u8, neutron_energy: u8) -> (bool, u8, f64) {
     let interaction: f64 = random();
     let absorption: f64 = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize] 
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
-    let fission: f64 = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize] 
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
-    let in_scatter: f64 = fission 
-        + (xsdata.scat_matrix[(neutron_energy as u8 * (energygroups.pow(2) - 1) + (meshid[0].matid * energygroups.pow(2))) as usize] 
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize]);
+        * xsdata.sigt[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize].powi(-1);
+
+    let siga = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    
+    let mut scat_mat = vec![0.0; energygroups as usize];
+
+    let scat: f64 = xsdata.sigs[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+
+    for energy in 0..energygroups {
+        scat_mat[energy as usize] = (0..energy+1).into_iter().map(|_energy| xsdata.scat_matrix[((energygroups.pow(2) * meshid[mesh_index].matid) + (energygroups * neutron_energy) + _energy as u8) as usize]).sum::<f64>()
+            / scat;
+    }
+
+    let random_scatter = random::<f64>();
+    
+    let scatter_energy = scat_mat.iter().position(|&x| x > random_scatter).unwrap() as u8;
+
     return match interaction {
         x if x < absorption => (false, neutron_energy, 0.0),
-        x if x >= absorption && x < in_scatter => {
-            (true, neutron_energy, 2.0 * (random::<f64>()) - 1.0)
-        }
-        _ => (true, neutron_energy + 1, 2.0 * (random::<f64>()) - 1.0),
+        _ => (true, scatter_energy, 2.0 * (random::<f64>()) - 1.0),
     };
 }
 
@@ -89,7 +97,7 @@ fn particle_travel(
 ) -> (bool, Vec<Vec<f64>>, usize, f64, u8, f64) {
     let mut delta_s: f64 = mu
         * -random::<f64>().ln()
-        * xsdata.sigt[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize].powi(-1);
+        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
 
     let mut same_material = true;
     while same_material == true {
@@ -104,7 +112,7 @@ fn particle_travel(
             || (mu >= 0.0 && end_x > mesh_end && mesh_index == meshid.len() - 1)
         {
             // hit the boundary
-            tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
+            tally[neutron_energy as usize][mesh_index] += mu.abs();
             let bound = if mu >= 0.0 { boundr } else { boundl };
 
             if bound > 0.0 {
@@ -114,7 +122,7 @@ fn particle_travel(
             }
         } else if (end_x - start_x).abs() > (mesh_end - start_x).abs() {
             // cross mesh boundary
-            tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
+            tally[neutron_energy as usize][mesh_index] += mu.abs();
 
             let prev_mat = meshid[mesh_index].matid;
 
@@ -125,7 +133,7 @@ fn particle_travel(
             }
         } else {
             // interaction
-            tally[neutron_energy as usize][mesh_index] += ((start_x - end_x) / mu).abs();
+            tally[neutron_energy as usize][mesh_index] += mu.abs();
 
             let (particle_exists, _neutron_energy, _mu) =
                 interaction(&xsdata, meshid, mesh_index, mattypes, energygroups, neutron_energy);
@@ -227,6 +235,8 @@ pub fn monte_carlo(
         k_fund: vec![0.0; variables.generations],
     };
 
+    println!("running MC code");
+
     for x in 0..variables.generations {
         let mut tally: Vec<Vec<f64>> =
             vec![vec![0.0; meshid.len()]; variables.energygroups as usize];
@@ -286,7 +296,7 @@ pub fn monte_carlo(
                     * flux;
                 k_new += k * delta_x * fission_source;
                 if x >= variables.skip {
-                    let conversion: f64 = (3565e6 * k)
+                    let conversion: f64 = (3565e6 * k * 36.2)
                         / (200e6
                         * 1.602176634e-19
                         * xsdata.nut[(0 + (variables.mattypes * 1)) as usize]

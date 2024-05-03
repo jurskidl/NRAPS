@@ -70,7 +70,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
 }
 
 pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
-    let file = File::open("./TestCaseA.txt").expect("Unable to read the file");
+    let file = File::open("./TestCaseC.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
     let end: usize = mapped_file.len();

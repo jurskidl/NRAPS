@@ -35,8 +35,8 @@ fn matrix_gen(
     // Insert 0,0 and n,n since these differ from the pattern
     a[0][0] = 2.0 * d_curr * (1.0 - beta_l)
         + meshid[0].delta_x 
-        * (xsdata.inv_sigtr[(meshid[0].matid + (mattypes * neutron_energy as u8)) as usize].powi(-1) 
-        - xsdata.scat_matrix[(neutron_energy as u8 * (energygroups.pow(2) - 1) + (meshid[0].matid * energygroups.pow(2))) as usize])
+        * (xsdata.sigt[(meshid[0].matid + (mattypes * neutron_energy as u8)) as usize]
+        - xsdata.scat_matrix[(((energygroups + 1) * neutron_energy as u8) + (energygroups.pow(2) * meshid[0].matid)) as usize])
         + d_nextcurr;
 
     a[0][1] = -d_nextcurr;
@@ -58,8 +58,8 @@ fn matrix_gen(
         a[x][x - 1] = -d_prevcurr;
         a[x][x] = d_prevcurr
             + meshid[x].delta_x
-            * (xsdata.inv_sigtr[(meshid[x].matid + (mattypes * neutron_energy as u8)) as usize].powi(-1) 
-        - xsdata.scat_matrix[(neutron_energy as u8 * (energygroups.pow(2) - 1) + (meshid[x].matid * energygroups.pow(2))) as usize])
+            * (xsdata.sigt[(meshid[x].matid + (mattypes * neutron_energy as u8)) as usize]
+            - xsdata.scat_matrix[(((energygroups + 1) * neutron_energy as u8) + (energygroups.pow(2) * meshid[x].matid)) as usize])
             + d_nextcurr;
         a[x][x + 1] = -d_nextcurr;
     }
@@ -88,8 +88,8 @@ fn matrix_gen(
     a[n - 1][n - 2] = -d_prevcurr;
     a[n - 1][n - 1] = 2.0 * d_curr * (1.0 - beta_r)
         + meshid[n - 1].delta_x 
-        * (xsdata.inv_sigtr[(meshid[n - 1].matid + (mattypes * neutron_energy as u8)) as usize].powi(-1) 
-        - xsdata.scat_matrix[(neutron_energy as u8 * (energygroups.pow(2) - 1) + (meshid[n - 1].matid * energygroups.pow(2))) as usize])
+        * (xsdata.sigt[(meshid[n - 1].matid + (mattypes * neutron_energy as u8)) as usize]
+        - xsdata.scat_matrix[(((energygroups + 1) * neutron_energy as u8) + (energygroups.pow(2) * meshid[n - 1].matid)) as usize])
         + d_nextcurr;
     a
 }
@@ -200,6 +200,22 @@ pub fn nalgebra_method (
         k = temp_k * (q.iter().flatten().sum::<f64>()/temp_q.iter().flatten().sum::<f64>());
         delta_k = ((k - temp_k)/temp_k).abs();
     }
+
+    let nut_matrix = (0..energygroups).into_iter().map(|energy| (0..meshid.len()).into_iter().map(|index| xsdata.nut[(meshid[index].matid + (mattypes * energy as u8)) as usize]).collect::<Vec<f64>>()).collect::<Vec<Vec<f64>>>();
+    let sigf_matrix = (0..energygroups).into_iter().map(|energy| (0..meshid.len()).into_iter().map(|index| xsdata.sigf[(meshid[index].matid + (mattypes * energy as u8)) as usize]).collect::<Vec<f64>>()).collect::<Vec<Vec<f64>>>();
+
+    let mut temp = vec![vec![1.0; n]; energygroups as usize];
+    for energy in 0..energygroups as usize {
+        for index in 0..meshid.len() {
+            temp[energy][index] = flux[energy][index] * nut_matrix[energy][index] * sigf_matrix[energy][index];
+        }
+    }
+
+    let power_flux = temp.into_iter().flatten().collect::<Vec<f64>>();
+    let power_flux = power_flux.chunks(energygroups as usize).map(|x| x.iter().sum::<f64>()).collect::<Vec<f64>>();
+    let power_constant = 3565e6 / (1.6022e-13 * 200.0 * power_flux.iter().zip(meshid).map(|(x ,y)| x * y.delta_x).sum::<f64>());
+
+    flux = (0..energygroups as usize).into_iter().map(|energy| flux[energy].iter().map(|x| x * power_constant).collect::<Vec<f64>>()).collect::<Vec<Vec<f64>>>();
 
     let temp_flux = flux.clone();
 
