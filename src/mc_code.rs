@@ -112,7 +112,7 @@ fn particle_travel(
             || (mu >= 0.0 && end_x > mesh_end && mesh_index == meshid.len() - 1)
         {
             // hit the boundary
-            tally[neutron_energy as usize][mesh_index] += mu.abs();
+            tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
             let bound = if mu >= 0.0 { boundr } else { boundl };
 
             if bound > 0.0 {
@@ -122,7 +122,7 @@ fn particle_travel(
             }
         } else if (end_x - start_x).abs() > (mesh_end - start_x).abs() {
             // cross mesh boundary
-            tally[neutron_energy as usize][mesh_index] += mu.abs();
+            tally[neutron_energy as usize][mesh_index] += ((start_x - mesh_end) / mu).abs();
 
             let prev_mat = meshid[mesh_index].matid;
 
@@ -133,7 +133,7 @@ fn particle_travel(
             }
         } else {
             // interaction
-            tally[neutron_energy as usize][mesh_index] += mu.abs();
+            tally[neutron_energy as usize][mesh_index] += ((start_x - end_x) / mu).abs();
 
             let (particle_exists, _neutron_energy, _mu) =
                 interaction(&xsdata, meshid, mesh_index, mattypes, energygroups, neutron_energy);
