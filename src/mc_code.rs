@@ -60,15 +60,13 @@ fn interaction(xsdata: &XSData, meshid: &Vec<Mesh>, mesh_index: usize, mattypes:
     let interaction: f64 = random();
     let absorption: f64 = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize] 
         * xsdata.sigt[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize].powi(-1);
-
-    let siga = xsdata.siga[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
     
     let mut scat_mat = vec![0.0; energygroups as usize];
 
     let scat: f64 = xsdata.sigs[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
 
     for energy in 0..energygroups {
-        scat_mat[energy as usize] = (0..energy+1).into_iter().map(|_energy| xsdata.scat_matrix[((energygroups.pow(2) * meshid[mesh_index].matid) + (energygroups * neutron_energy) + _energy as u8) as usize]).sum::<f64>()
+        scat_mat[energy as usize] = (0..energy+1).into_iter().map(|_energy| xsdata.scat_matrix[((energygroups.pow(2) * meshid[mesh_index].matid) + (energygroups * neutron_energy) + _energy) as usize]).sum::<f64>()
             / scat;
     }
 
