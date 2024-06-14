@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::fs::File;
 
 use memmap2::MmapOptions;
@@ -9,14 +8,6 @@ const EQUALS: u8 = 61;
 const NEWLINE: u8 = 10;
 const POUND: u8 = 35;
 
-// If multithreading the input processing
-// fn next_end_line(mut end: usize, buffer: &[u8]) -> usize {
-//     while buffer[end] != NEWLINE && end < buffer.len() {
-//         end += 1;
-//     }
-//     end + 1
-// }
-
 fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     while buffer[pos] != NEWLINE && pos < end {
         pos += 1;
@@ -24,18 +15,47 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     pos + 1
 }
 
-fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, String> {
-    let mut hash: HashMap<String, String> = HashMap::with_capacity(24);
+fn get_index(key: &str) -> usize {
+    return match key {
+        "analk" => 0,
+        "mattypes" => 1,
+        "energygroups" => 2,
+        "generations" => 3,
+        "histories" => 4,
+        "skip" => 5,
+        "numass" => 6,
+        "numrods" => 7,
+        "roddia" => 8,
+        "rodpitch" => 9,
+        "mpfr" => 10,
+        "mpwr" => 11,
+        "boundl" => 12,
+        "boundr" => 13,
+        "sigt" =>  14,
+        "sigs" => 15,
+        "mu" => 16,
+        "siga" => 17,
+        "sigf" => 18,
+        "nut" => 19,
+        "chit" => 20,
+        "scat" => 21,
+        "matid" => 22,
+        "solution" => 23,
+        "solver" => 24,
+        _ => 25,
+    }
+}
 
-    let mut pos = start;
-    let mut line_start = start;
-    let mut name_end = start;
-    let mut val_start = start;
 
-    // If multithreading
-    // if end != buffer.len() && buffer[end] != NEWLINE {
-    //     end = next_end_line(end, buffer);
-    // }
+fn scan_ascii_chunk(buffer: &[u8]) -> [String; 26] {
+    let end = buffer.len();
+
+    let mut temp: [String; 26] = Default::default();
+
+    let mut pos: usize = 0;
+    let mut line_start: usize = 0;
+    let mut name_end: usize = 0;
+    let mut val_start: usize = 0;
 
     while pos < end {
         match buffer[pos] {
@@ -56,9 +76,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
                     let value = String::from_utf8_lossy(&buffer[val_start..pos])
                         .trim()
                         .to_string();
-                    hash.entry(key)
-                        .and_modify(|existing| *existing = existing.to_owned() + " " + &value) // I don't know why this works but the gods have smiled upon me
-                        .or_insert(value);
+                    temp[get_index(key.as_str())] += &(" ".to_owned() + &value);
                 } else {}
                 line_start = pos + 1;
             }
@@ -66,7 +84,7 @@ fn scan_ascii_chunk(start: usize, end: usize, buffer: &[u8]) -> HashMap<String, 
         }
         pos += 1;
     }
-    hash
+    temp
 }
 
 pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
@@ -74,54 +92,24 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
     let end: usize = mapped_file.len();
-    let hash: HashMap<String, String> = scan_ascii_chunk(start, end, &&mapped_file);
-
-    // For Multithreading
-    // let size: usize = mapped_file.len();
-    // let threads: usize = thread::available_parallelism().unwrap().get();
-    // let chunk_length = size / threads;
-    // let starting_points: Vec<usize> = (0..threads).map(|x| x * chunk_length).collect();
-    // let mut ending_points: Vec<usize> = Vec::from_iter(starting_points[1..threads].iter().cloned());
-    // ending_points.push(size);
-
-    // let mut hash: HashMap<String, String> = HashMap::with_capacity(NUM_VARS);
-    // std::thread::scope(|scope| {
-    //     let mut handles = Vec::with_capacity(threads);
-    //     for thread in 0..threads {
-    //         let start = starting_points[thread];
-    //         let end = ending_points[thread];
-    //         let buffer = &mapped_file;
-    //         let handle = scope.spawn(move || scan_ascii_chunk(start, end, &buffer));
-    //         handles.push(handle);
-    //     }
-
-    //     // Aggregate the results
-    //     for handle in handles {
-    //         let chunk_result = handle.join().unwrap();
-    //         for (key, value) in chunk_result {
-    //             hash.entry(key.trim().to_string())
-    //                 .and_modify(|existing| *existing = existing.to_owned() + " " + &value)
-    //                 .or_insert(value);
-    //         }
-    //     }
-    // });
+    let temp = scan_ascii_chunk(&mapped_file[start..end]);
 
     let variables = Variables {
-        analk: hash.get("analk").unwrap().trim().parse().unwrap(),
-        mattypes: hash.get("mattypes").unwrap().trim().parse().unwrap(),
-        energygroups: hash.get("energygroups").unwrap().trim().parse().unwrap(),
-        generations: hash.get("generations").unwrap().trim().parse().unwrap(),
-        histories: hash.get("histories").unwrap().trim().parse().unwrap(),
-        skip: hash.get("skip").unwrap().trim().parse().unwrap(),
-        numass: hash.get("numass").unwrap().trim().parse().unwrap(),
-        numrods: hash.get("numrods").unwrap().trim().parse().unwrap(),
-        roddia: hash.get("roddia").unwrap().trim().parse().unwrap(),
-        rodpitch: hash.get("rodpitch").unwrap().trim().parse::<f64>().unwrap()
-            - hash.get("roddia").unwrap().trim().parse::<f64>().unwrap(),
-        mpfr: hash.get("mpfr").unwrap().trim().parse().unwrap(),
-        mpwr: hash.get("mpwr").unwrap().trim().parse().unwrap(),
-        boundl: hash.get("boundl").unwrap().trim().parse().unwrap(),
-        boundr: hash.get("boundr").unwrap().trim().parse().unwrap(),
+        analk: temp[0].trim().parse().unwrap(),
+        mattypes: temp[1].trim().parse().unwrap(),
+        energygroups: temp[2].trim().parse().unwrap(),
+        generations: temp[3].trim().parse().unwrap(),
+        histories: temp[4].trim().parse().unwrap(),
+        skip: temp[5].trim().parse().unwrap(),
+        numass: temp[6].trim().parse().unwrap(),
+        numrods: temp[7].trim().parse().unwrap(),
+        roddia: temp[8].trim().parse().unwrap(),
+        rodpitch: temp[9].trim().parse::<f64>().unwrap()
+            - temp[8].trim().parse::<f64>().unwrap(),
+        mpfr: temp[10].trim().parse().unwrap(),
+        mpwr: temp[11].trim().parse().unwrap(),
+        boundl: temp[12].trim().parse().unwrap(),
+        boundr: temp[13].trim().parse().unwrap(),
     };
 
     let deltax = DeltaX {
@@ -131,52 +119,36 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
 
     // index into vectors via desired_xs = sigtr[(mat# + (energygroup*mattypes) as usize]
     let mut xsdata = XSData {
-        sigt: hash
-            .get("sigt")
-            .unwrap()
+        sigt: temp[14]
             .split_whitespace()
             .map(|x| x.parse::<f64>().unwrap())
             .collect(),
-        sigs: hash
-            .get("sigs")
-            .unwrap()
+        sigs: temp[15]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        mu: hash
-            .get("mu")
-            .unwrap()
+        mu: temp[16]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        siga: hash
-            .get("siga")
-            .unwrap()
+        siga: temp[17]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        sigf: hash
-            .get("sigf")
-            .unwrap()
+        sigf: temp[18]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        nut: hash
-            .get("nut")
-            .unwrap()
+        nut: temp[19]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
-        chit: hash
-            .get("chit")
-            .unwrap()
+        chit: temp[20]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
         // Index via [(mattype * energygroups) + ((energygroups * starting_energy) + final_energy)]
-        scat_matrix: hash
-            .get("scat")
-            .unwrap()
+        scat_matrix: temp[21]
             .split_whitespace()
             .map(|x| x.parse().unwrap())
             .collect(),
@@ -187,9 +159,7 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
         xsdata.inv_sigtr.push((xsdata.sigt[index] - xsdata.mu[index] * xsdata.sigs[index]).powi(-1));
     }
 
-    let matid: Vec<u8> = hash
-        .get("matid")
-        .unwrap()
+    let matid: Vec<u8> = temp[22]
         .split_ascii_whitespace()
         .map(|x| x.parse::<u8>().unwrap())
         .collect();
@@ -198,8 +168,8 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
         xsdata,
         matid,
         deltax,
-        hash.get("solution").unwrap().trim().parse().unwrap(),
-        match hash.get("solver").unwrap().trim() {
+        temp[23].trim().parse().unwrap(),
+        match temp[24].trim() {
             "1" => Solver::Gaussian,
             "2" => Solver::Jacobian,
             "3" => Solver::SR,

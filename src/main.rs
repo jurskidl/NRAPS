@@ -296,65 +296,58 @@ fn energy_collapse(meshid: &Vec<Mesh>, mattypes: u8, energygroups: u8, numrods: 
 }
 
 fn main() {
-    let now = SystemTime::now();
+    // let now = SystemTime::now();
 
-    let (variables, xsdata, matid, deltax, solution, solver) = process_input();
+    // let (variables, xsdata, matid, deltax, solution, solver) = process_input();
 
-    let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
+    // let (meshid, fuel_indices) = mesh_gen(matid, &variables, &deltax);
 
-    let results = match (solution, solver) {
-        (1, _) => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-        (_, Solver::LinAlg) => nalgebra_method(
-            &xsdata,
-            &meshid,
-            variables.energygroups,
-            variables.mattypes,
-            variables.boundl,
-            variables.boundr,
-            variables.numass,
-        ),
-        (_, _) => SolutionResults {
-            flux: Vec::new(),
-            assembly_average: Vec::new(),
-            fission_source: Vec::new(),
-            k: Vec::new(),
-            k_fund: Vec::new(),
-        }, // not implemented
-    };
+    // let results = match (solution, solver) {
+    //     (1, _) => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
+    //     (_, Solver::LinAlg) => nalgebra_method(
+    //         &xsdata,
+    //         &meshid,
+    //         variables.energygroups,
+    //         variables.mattypes,
+    //         variables.boundl,
+    //         variables.boundr,
+    //         variables.numass,
+    //     ),
+    //     (_, _) => SolutionResults {
+    //         flux: Vec::new(),
+    //         assembly_average: Vec::new(),
+    //         fission_source: Vec::new(),
+    //         k: Vec::new(),
+    //         k_fund: Vec::new(),
+    //     }, // not implemented
+    // };
 
-    // energy_collapse(&meshid, variables.mattypes, variables.energygroups, variables.numrods, variables.mpfr, results.flux.clone(), &xsdata);
+    // // energy_collapse(&meshid, variables.mattypes, variables.energygroups, variables.numrods, variables.mpfr, results.flux.clone(), &xsdata);
 
-    let _ = plot_solution(
-        results,
-        variables.energygroups,
-        variables.generations,
-        meshid.len(),
-        meshid[meshid.len() - 1].mesh_right,
-    );
+    // let _ = plot_solution(
+    //     results,
+    //     variables.energygroups,
+    //     variables.generations,
+    //     meshid.len(),
+    //     meshid[meshid.len() - 1].mesh_right,
+    // );
 
-    print!(
-        "Run was completed in {} milliseconds \n",
-        now.elapsed().unwrap().as_millis()
-    );
+    // print!(
+    //     "Run was completed in {} milliseconds \n",
+    //     now.elapsed().unwrap().as_millis()
+    // );
 
     // below is for timing
-    // let mut now = SystemTime::now();
+    let mut now = SystemTime::now();
 
-    // for zyn in 0..100 {
-    //     if zyn % 10 == 0 {
-    //         print!(
-    //             "Average time over those 10000 runs was {} seconds \n",
-    //             now.elapsed().unwrap().as_secs() / 10
-    //         );
-    //         now = SystemTime::now();
-    //     }
-    //     let results = match solution {
-    //         1 => monte_carlo(&variables, &xsdata, &deltax, &meshid, &fuel_indices, 1.0),
-    //         _ => SolutionResults {
-    //             flux: Vec::new(),
-    //             fission_source: Vec::new(),
-    //             k: Vec::new(),
-    //         }, // not implemented
-    //     };
-    // }
+    for zyn in 0..100000 {
+        if zyn % 10000 == 0 {
+            print!(
+                "Average time over those 10000 runs was {} seconds \n",
+                now.elapsed().unwrap().as_micros() / 10000
+            );
+            now = SystemTime::now();
+        }
+        let _ = process_input();
+    };
 }
