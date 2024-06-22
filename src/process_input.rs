@@ -1,8 +1,8 @@
 use std::fs::File;
-
 use memmap2::MmapOptions;
 
 use crate::{DeltaX, Solver, Variables, XSData};
+
 
 const EQUALS: u8 = 61;
 const NEWLINE: u8 = 10;
@@ -15,37 +15,36 @@ fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
     pos + 1
 }
 
-fn get_index(key: &str) -> usize {
-    return match key {
-        "analk" => 0,
-        "mattypes" => 1,
-        "energygroups" => 2,
-        "generations" => 3,
-        "histories" => 4,
-        "skip" => 5,
-        "numass" => 6,
-        "numrods" => 7,
-        "roddia" => 8,
-        "rodpitch" => 9,
-        "mpfr" => 10,
-        "mpwr" => 11,
-        "boundl" => 12,
-        "boundr" => 13,
-        "sigt" =>  14,
-        "sigs" => 15,
-        "mu" => 16,
-        "siga" => 17,
-        "sigf" => 18,
-        "nut" => 19,
-        "chit" => 20,
-        "scat" => 21,
-        "matid" => 22,
-        "solution" => 23,
-        "solver" => 24,
+fn get_index(key: &str, length: usize) -> usize {
+    return match (key, length) {
+        ("lk", 5) => 0,
+        ("es", 8) => 1,
+        ("ps", 12) => 2,
+        ("ns", 11) => 3,
+        ("es", 9) => 4,
+        ("ip", 4) => 5,
+        ("ss", 6) => 6,
+        ("ds", 7) => 7,
+        ("ia", 6) => 8,
+        ("ch", 8) => 9,
+        ("fr", 4) => 10,
+        ("wr", 4) => 11,
+        ("dl", 6) => 12,
+        ("dr", 6) => 13,
+        ("gt", 4) => 14,
+        ("gs", 4) => 15,
+        ("mu", 2) => 16,
+        ("ga", 4) => 17,
+        ("gf", 4) => 18,
+        ("ut", 3) => 19,
+        ("it", 4) => 20,
+        ("at", 4) => 21,
+        ("id", 5) => 22,
+        ("on", 8) => 23,
+        ("er", 6) => 24,
         _ => 25,
-    }
+    };
 }
-
 
 fn scan_ascii_chunk(buffer: &[u8]) -> [String; 26] {
     let end = buffer.len();
@@ -71,13 +70,14 @@ fn scan_ascii_chunk(buffer: &[u8]) -> [String; 26] {
                 if name_end > line_start {
                     let key = String::from_utf8_lossy(&buffer[line_start..name_end])
                         .trim()
-                        .to_string()
                         .to_ascii_lowercase();
                     let value = String::from_utf8_lossy(&buffer[val_start..pos])
                         .trim()
                         .to_string();
-                    temp[get_index(key.as_str())] += &(" ".to_owned() + &value);
-                } else {}
+                    let length = key.len();
+                    temp[get_index(&key[length-2..length], length)] += &(" ".to_owned() + &value);
+                } else {
+                }
                 line_start = pos + 1;
             }
             _ => {}
@@ -104,8 +104,7 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
         numass: temp[6].trim().parse().unwrap(),
         numrods: temp[7].trim().parse().unwrap(),
         roddia: temp[8].trim().parse().unwrap(),
-        rodpitch: temp[9].trim().parse::<f64>().unwrap()
-            - temp[8].trim().parse::<f64>().unwrap(),
+        rodpitch: temp[9].trim().parse::<f64>().unwrap() - temp[8].trim().parse::<f64>().unwrap(),
         mpfr: temp[10].trim().parse().unwrap(),
         mpwr: temp[11].trim().parse().unwrap(),
         boundl: temp[12].trim().parse().unwrap(),
@@ -156,7 +155,9 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
     };
 
     for index in 0..xsdata.sigt.len() {
-        xsdata.inv_sigtr.push((xsdata.sigt[index] - xsdata.mu[index] * xsdata.sigs[index]).powi(-1));
+        xsdata
+            .inv_sigtr
+            .push((xsdata.sigt[index] - xsdata.mu[index] * xsdata.sigs[index]).powi(-1));
     }
 
     let matid: Vec<u8> = temp[22]
