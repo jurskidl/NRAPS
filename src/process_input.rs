@@ -1,15 +1,10 @@
-use std::fs::File;
 use memmap2::MmapOptions;
+use std::fs::File;
 
 use crate::{DeltaX, Solver, Variables, XSData};
 
-
-const EQUALS: u8 = 61;
-const NEWLINE: u8 = 10;
-const POUND: u8 = 35;
-
 fn skip_line(mut pos: usize, end: usize, buffer: &[u8]) -> usize {
-    while buffer[pos] != NEWLINE && pos < end {
+    while buffer[pos] != b'\n' && pos < end {
         pos += 1;
     }
     pos + 1
@@ -58,15 +53,15 @@ fn scan_ascii_chunk(buffer: &[u8]) -> [String; 26] {
 
     while pos < end {
         match buffer[pos] {
-            POUND => {
+            b'#' => {
                 pos = skip_line(pos, end, buffer);
                 line_start = pos;
             }
-            EQUALS => {
+            b'=' => {
                 name_end = pos - 1;
                 val_start = pos + 1;
             }
-            NEWLINE => {
+            b'\n' => {
                 if name_end > line_start {
                     let key = String::from_utf8_lossy(&buffer[line_start..name_end])
                         .trim()
@@ -75,7 +70,7 @@ fn scan_ascii_chunk(buffer: &[u8]) -> [String; 26] {
                         .trim()
                         .to_string();
                     let length = key.len();
-                    temp[get_index(&key[length-2..length], length)] += &(" ".to_owned() + &value);
+                    temp[get_index(&key[length - 2..length], length)] += &(" ".to_owned() + &value);
                 } else {
                 }
                 line_start = pos + 1;
@@ -87,7 +82,7 @@ fn scan_ascii_chunk(buffer: &[u8]) -> [String; 26] {
     temp
 }
 
-pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
+pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, bool, Solver) {
     let file = File::open("./TestCaseC.txt").expect("Unable to read the file");
     let mapped_file = unsafe { MmapOptions::new().map(&file).unwrap() };
     let start: usize = 0;
@@ -104,7 +99,7 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
         numass: temp[6].trim().parse().unwrap(),
         numrods: temp[7].trim().parse().unwrap(),
         roddia: temp[8].trim().parse().unwrap(),
-        rodpitch: temp[9].trim().parse::<f64>().unwrap() - temp[8].trim().parse::<f64>().unwrap(),
+        rodpitch: temp[9].trim().parse::<f32>().unwrap() - temp[8].trim().parse::<f32>().unwrap(),
         mpfr: temp[10].trim().parse().unwrap(),
         mpwr: temp[11].trim().parse().unwrap(),
         boundl: temp[12].trim().parse().unwrap(),
@@ -112,15 +107,15 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
     };
 
     let deltax = DeltaX {
-        fuel: variables.roddia / variables.mpfr as f64,
-        water: variables.rodpitch / variables.mpwr as f64,
+        fuel: variables.roddia / variables.mpfr as f32,
+        water: variables.rodpitch / variables.mpwr as f32,
     };
 
     // index into vectors via desired_xs = sigtr[(mat# + (energygroup*mattypes) as usize]
     let mut xsdata = XSData {
         sigt: temp[14]
             .split_whitespace()
-            .map(|x| x.parse::<f64>().unwrap())
+            .map(|x| x.parse::<f32>().unwrap())
             .collect(),
         sigs: temp[15]
             .split_whitespace()
@@ -169,7 +164,7 @@ pub fn process_input() -> (Variables, XSData, Vec<u8>, DeltaX, u8, Solver) {
         xsdata,
         matid,
         deltax,
-        temp[23].trim().parse().unwrap(),
+        temp[23].trim().parse::<u8>().unwrap() != 1,
         match temp[24].trim() {
             "1" => Solver::Gaussian,
             "2" => Solver::Jacobian,
