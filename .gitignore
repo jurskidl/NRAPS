@@ -1,6 +1,3 @@
-/target
-\target
-/.vscode
-\.vscode
-/.idea
-\.idea
+target/
+.vscode/
+.idea/
