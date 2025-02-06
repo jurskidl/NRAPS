@@ -351,7 +351,7 @@ pub fn monte_carlo(
             .sum::<f32>()
             / (generations - (variables.skip - 1)) as f32;
     }
-    println!("{}", results.k_fund[results.k_fund.len() - 1]);
+    //println!("{}", results.k_fund[results.k_fund.len() - 1]);
 
     results
 }
