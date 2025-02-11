@@ -67,38 +67,39 @@ fn cross_mesh(
     (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
-fn interaction(
-    xsdata: &XSData,
-    meshid: &Vec<Mesh>,
-    mesh_index: usize,
-    mattypes: u8,
+fn scat_mat_calc(
     energygroups: u8,
+    matid: u8,
     neutron_energy: u8,
-) -> (bool, u8, f32) {
-    let interaction: f32 = random();
-    let absorption: f32 = xsdata.siga
-        [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize]
-        * xsdata.sigt[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize].powi(-1);
-
+    sigs: f32,
+    xsdata: &XSData,
+) -> Vec<f32> {
     let mut scat_mat = vec![0.0; energygroups as usize];
-
-    let scat: f32 = xsdata.sigs[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
 
     for energy in 0..energygroups {
         scat_mat[energy as usize] = (0..energy + 1)
             .into_iter()
             .map(|_energy| {
-                xsdata.scat_matrix[((energygroups.pow(2) * meshid[mesh_index].matid)
+                xsdata.scat_matrix[((energygroups.pow(2) * matid)
                     + (energygroups * neutron_energy)
                     + _energy) as usize]
             })
             .sum::<f32>()
-            / scat;
+            / sigs;
     }
+    scat_mat
+}
 
-    let random_scatter = random::<f32>();
+fn interaction(
+    interaction: f32,
+    scat_mat: Vec<f32>,
+    xsdata: &XSData,
+    xs_index: usize,
+    neutron_energy: u8,
+) -> (bool, u8, f32) {
+    let absorption: f32 = xsdata.siga[xs_index] * xsdata.sigt[xs_index].powi(-1);
 
-    let scatter_energy = scat_mat.iter().position(|&x| x > random_scatter).unwrap() as u8;
+    let scatter_energy = scat_mat.iter().position(|&x| x >= random::<f32>()).unwrap() as u8;
 
     return match interaction {
         x if x < absorption => (false, neutron_energy, 0.0),
@@ -119,9 +120,8 @@ fn particle_travel(
     boundl: f32,
     xsdata: &XSData,
 ) -> (bool, Vec<Vec<f32>>, usize, f32, u8, f32) {
-    let mut delta_s: f32 = mu
-        * -random::<f32>().ln()
-        * xsdata.inv_sigtr[(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+    let xs_index = (meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize;
+    let mut delta_s: f32 = mu * -random::<f32>().ln() * xsdata.inv_sigtr[xs_index];
 
     let mut same_material = true;
     while same_material == true {
@@ -159,14 +159,16 @@ fn particle_travel(
             // interaction
             tally[neutron_energy as usize][mesh_index] += ((start_x - end_x) / mu).abs();
 
-            let (particle_exists, _neutron_energy, _mu) = interaction(
-                &xsdata,
-                meshid,
-                mesh_index,
-                mattypes,
+            let scat_mat = scat_mat_calc(
                 energygroups,
+                meshid[mesh_index].matid,
                 neutron_energy,
+                xsdata.sigs[xs_index],
+                xsdata,
             );
+
+            let (particle_exists, _neutron_energy, _mu) =
+                interaction(random::<f32>(), scat_mat, &xsdata, xs_index, neutron_energy);
             if particle_exists == false {
                 return (
                     particle_exists,
@@ -180,10 +182,7 @@ fn particle_travel(
             start_x = end_x;
             neutron_energy = _neutron_energy;
             mu = _mu;
-            delta_s = mu
-                * -random::<f32>().ln()
-                * xsdata.inv_sigtr
-                    [(meshid[mesh_index].matid + (mattypes * neutron_energy)) as usize];
+            delta_s = mu * -random::<f32>().ln() * xsdata.inv_sigtr[xs_index];
         }
     }
     (true, tally, mesh_index, mu, neutron_energy, start_x)
