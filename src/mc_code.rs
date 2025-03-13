@@ -3,6 +3,7 @@ use std::thread;
 
 use crate::{DeltaX, Mesh, SolutionResults, Variables, XSData};
 
+#[inline(always)]
 fn energy(
     chi: f32,
     index: usize,
@@ -10,24 +11,32 @@ fn energy(
     xsdata: &XSData,
     meshid: &Vec<Mesh>,
 ) -> u8 {
-    let mut temp = 0.0;
+    // Set values for use in later step. Optimized away anyway
+    let skip = meshid[index].matid as usize;
+    let step = variables.mattypes as usize;
+
+    // Use pre-allocated array for better vectorization
+    let mut cumulative = 0.0;
+
     let chit: Vec<f32> = xsdata
         .chit
         .iter()
-        .skip(meshid[index].matid as usize)
-        .step_by(variables.mattypes as usize)
-        .map(|x| {
-            temp += x;
-            return temp;
+        .skip(skip)
+        .step_by(step)
+        .map(|value| {
+            cumulative += value;
+            cumulative
         })
         .collect();
-    chit.iter().position(|&x| x >= chi).unwrap() as u8
+    chit.partition_point(|&x| x < chi).min(chit.len() - 1) as u8
 }
 
+#[inline(always)]
 fn direction(mu: f32) -> f32 {
     2.0 * (mu) - 1.0
 }
 
+// #[inline(always)]
 fn spawn_neutron(
     fuel_indices: &Vec<usize>,
     variables: &Variables,
@@ -43,6 +52,7 @@ fn spawn_neutron(
     )
 }
 
+#[inline(always)]
 fn hit_boundary(mu: f32, start_x: f32, delta_s: f32, bound: f32, mesh_end: f32) -> (f32, f32, f32) {
     (
         mu * (-bound),
@@ -51,14 +61,15 @@ fn hit_boundary(mu: f32, start_x: f32, delta_s: f32, bound: f32, mesh_end: f32) 
     )
 }
 
+#[inline(always)]
 fn cross_mesh(
-    mesh_index: usize,
+    mut mesh_index: usize,
     mu: f32,
     start_x: f32,
     mesh_end: f32,
     delta_s: f32,
 ) -> (f32, f32, usize) {
-    let mesh_index = if mu >= 0.0 {
+    mesh_index = if mu >= 0.0 {
         mesh_index + 1
     } else {
         mesh_index - 1
@@ -67,29 +78,39 @@ fn cross_mesh(
     (delta_s + (start_x - mesh_end), mesh_end, mesh_index)
 }
 
+#[inline(always)]
 fn scat_mat_calc(
     energygroups: u8,
     matid: u8,
     neutron_energy: u8,
-    sigs: f32,
-    xsdata: &XSData,
+    inv_sigs: f32,
+    scat_matrix: &Vec<f32>,
 ) -> Vec<f32> {
-    let mut scat_mat = vec![0.0; energygroups as usize];
+    let base_idx: usize =
+        ((energygroups.pow(2) * matid) + (energygroups * neutron_energy)) as usize;
 
-    for energy in 0..energygroups {
-        scat_mat[energy as usize] = (0..energy + 1)
-            .into_iter()
-            .map(|_energy| {
-                xsdata.scat_matrix[((energygroups.pow(2) * matid)
-                    + (energygroups * neutron_energy)
-                    + _energy) as usize]
-            })
-            .sum::<f32>()
-            / sigs;
-    }
+    // let mut scat_mat = vec![0.0; energygroups as usize];
+    let mut cumulative: f32 = 0.0;
+
+    let scat_mat = (0..energygroups as usize)
+        .into_iter()
+        .map(|_energy| {
+            cumulative += scat_matrix[base_idx + _energy];
+            cumulative * inv_sigs
+        })
+        .collect();
+    // for energy in 0..energygroups {
+    //     scat_mat[energy as usize] = (0..energy + 1)
+    //         .into_iter()
+    //         .map(|_energy| xsdata.scat_matrix[base_idx + _energy as usize])
+    //         .sum::<f32>()
+    //         * inv_sigs;
+    // }
+
     scat_mat
 }
 
+#[inline(always)]
 fn interaction(
     interaction: f32,
     scat_mat: Vec<f32>,
@@ -97,14 +118,17 @@ fn interaction(
     xs_index: usize,
     neutron_energy: u8,
 ) -> (bool, u8, f32) {
-    let absorption: f32 = xsdata.siga[xs_index] * xsdata.sigt[xs_index].powi(-1);
+    let absorption: f32 = xsdata.siga[xs_index] / xsdata.sigt[xs_index];
+    let mu = 2.0 * (random::<f32>()) - 1.0;
 
-    let scatter_energy = scat_mat.iter().position(|&x| x >= random::<f32>()).unwrap() as u8;
+    let scatter_energy = scat_mat
+        .partition_point(|&x| x < random::<f32>())
+        .min(scat_mat.len() - 1) as u8;
 
-    return match interaction {
+    match interaction {
         x if x < absorption => (false, neutron_energy, 0.0),
-        _ => (true, scatter_energy, 2.0 * (random::<f32>()) - 1.0),
-    };
+        _ => (true, scatter_energy, mu),
+    }
 }
 
 fn particle_travel(
@@ -163,8 +187,8 @@ fn particle_travel(
                 energygroups,
                 meshid[mesh_index].matid,
                 neutron_energy,
-                xsdata.sigs[xs_index],
-                xsdata,
+                1.0 / xsdata.sigs[xs_index],
+                &xsdata.scat_matrix,
             );
 
             let (particle_exists, _neutron_energy, _mu) =
@@ -229,7 +253,7 @@ fn particle_lifetime(
             );
         }
     }
-    return tally;
+    tally
 }
 
 fn average_assembly(mut results: SolutionResults, numass: u8, energygroups: u8) -> SolutionResults {
@@ -274,7 +298,7 @@ pub fn monte_carlo(
         k_new = 0.0;
 
         // For Multithreading
-        // One threads for the OS to use
+        // One thread for the OS to use
         let threads: usize = thread::available_parallelism().unwrap().get() - 1;
         let threaded_histories = variables.histories / threads;
         let starting_points: Vec<usize> = (0..threads).map(|x| x * threaded_histories).collect();
@@ -358,7 +382,10 @@ pub fn monte_carlo(
 mod tests {
     extern crate float_cmp;
     #[allow(unused)]
-    use crate::mc_code::{cross_mesh, direction, energy, hit_boundary, interaction};
+    use crate::mc_code::{cross_mesh, direction, energy, hit_boundary, interaction, scat_mat_calc};
+    #[allow(unused)]
+    use crate::{DeltaX, Mesh, SolutionResults, Variables, XSData};
+    use float_cmp::approx_eq;
     #[allow(unused)]
     use float_cmp::ApproxEq;
 
@@ -433,4 +460,98 @@ mod tests {
     //     let test_energy = energy(1E-9, &vec![0.0, 0.0, 0.5, 1.0]);
     //     assert_eq!(test_energy, 2)
     // }
+
+    #[test]
+    fn test_scat_mat_calc() {
+        let variables = Variables {
+            analk: 1,
+            mattypes: 4,
+            energygroups: 2,
+            generations: 2,
+            histories: 10000,
+            skip: 1,
+            numass: 2,
+            numrods: 2,
+            roddia: 1.0,
+            rodpitch: 0.5,
+            mpfr: 1,
+            mpwr: 2,
+            boundl: 1.0,
+            boundr: 1.0,
+        };
+
+        let xsdata = XSData {
+            sigt: vec![0.200, 0.200, 0.200, 0.1, 1.00, 1.20, 1.10, 1.1],
+            sigs: vec![0.200, 0.200, 0.200, 0.0, 0.80, 0.80, 1.10, 0.1],
+            mu: vec![0.000, 0.000, 0.000, 0.0, 0.00, 0.00, 0.00, 0.0],
+            siga: vec![0.000, 0.000, 0.000, 0.1, 0.20, 0.40, 0.00, 1.0],
+            sigf: vec![0.000, 0.000, 0.000, 0.0, 0.18, 0.30, 0.00, 0.0],
+            nut: vec![0.000, 0.000, 0.000, 0.0, 1.40, 1.50, 0.00, 0.0],
+            chit: vec![1.000, 1.000, 0.000, 0.0, 0.00, 0.00, 0.00, 0.0],
+            // Index via [(mattype * energygroups) + ((energygroups * starting_energy) + final_energy)]
+            scat_matrix: vec![
+                0.185, 0.015, 0.000, 0.800, 0.185, 0.015, 0.000, 0.800, 0.170, 0.030, 0.000, 1.100,
+                0.000, 0.000, 0.000, 0.100,
+            ],
+            inv_sigtr: vec![
+                5.0,
+                5.0,
+                5.0,
+                10.0,
+                1.00,
+                0.83333333,
+                0.9090909090909,
+                0.9090909090909,
+            ],
+        };
+
+        let scat_mat_check: Vec<Vec<f32>> = vec![
+            vec![0.925, 1.0],
+            vec![0.925, 1.0],
+            vec![0.85, 1.0],
+            vec![f32::NAN, f32::NAN], // skip this since it can't be compared
+            vec![0.0, 1.0],
+            vec![0.0, 1.0],
+            vec![0.0, 1.0],
+            vec![0.0, 1.0],
+        ];
+
+        let neutron_energy = 0;
+
+        for matid in 0..3 {
+            let xs_index = (matid + (variables.mattypes * neutron_energy)) as usize;
+
+            let scat_mat = scat_mat_calc(
+                variables.energygroups,
+                matid,
+                neutron_energy,
+                1.0 / xsdata.sigs[xs_index],
+                &xsdata.scat_matrix,
+            );
+
+            println!("{:?}", scat_mat);
+            assert_eq!(
+                scat_mat,
+                scat_mat_check[((neutron_energy * 4) + matid) as usize]
+            );
+        }
+
+        let neutron_energy = 1;
+
+        for matid in 0..4 {
+            let xs_index = (matid + (variables.mattypes * neutron_energy)) as usize;
+
+            let scat_mat = scat_mat_calc(
+                variables.energygroups,
+                matid,
+                neutron_energy,
+                1.0 / xsdata.sigs[xs_index],
+                &xsdata.scat_matrix,
+            );
+            assert_eq!(
+                scat_mat,
+                scat_mat_check[((neutron_energy * 4) + matid) as usize]
+            );
+        }
+    }
 }
