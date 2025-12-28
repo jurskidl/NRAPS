@@ -35,6 +35,7 @@ Other items to change include refactoring to improve testability and ultimately 
 | Refactor code to improve readability and maintainability                 |         :x:        |
 | Create unit tests that ensure accuracy and validity of segments of code  |         :x:        |
 | Create GPU compute shader to perform particle calulcations               |         :x:        |
+
 To implement the GPU compute shader, numerous steps will need to be completed to ensure the pipeline runs efficiently. This requires some sort of [event based algorithm](https://www.sciencedirect.com/science/article/pii/S1738573317302966#sec4) to vectorize the solutions to prevent branch divergence. There will also need to be implementation (Woodcock tracking](https://www.yiningkarlli.com/projects/specdecomptracking/references/Woodcock1965.pdf)
 ### Deterministic Solver
 The Deterministic solver currently relies on the NAlgebra crate, whereas the goal is to develop an internal matrix solver. This internal solution method should be able to solve the problem in 4 different ways: 1) direct matrix inversion, 2) Gaussian Elimination, 3) Jacobi Method, and 4) successive over-relaxation (SOR).
@@ -44,5 +45,6 @@ The Deterministic solver currently relies on the NAlgebra crate, whereas the goa
 | Refactor code to improve readability and maintainability                 |         :x:        |
 | Create unit tests that ensure accuracy and validity of segments of code  |         :x:        |
 | Develop all four solution methods                                        |         :x:        |
+
 ## Plotting Results
 The current plotting method saves the data to a file and executes python code via the terminal to plot using the matplotlib library in python. This should at the very least be transferred over to rust and run via the PyO3 crate.
