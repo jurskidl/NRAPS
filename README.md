@@ -12,9 +12,13 @@ The project consists of several peices that work together to function. These par
 A lot of work went into the input pocessing to ensure it ran quickly at the time the project was submitted. Currently, the code processes the input file using a memmap that enables it to read the file extremely quickly. 
 TODO: add assumptions made on the input file formatting.
 Multithreading was tested and was relatively inconsequential as evidenced in the run time figure below. The time it takes to spin up multiple threads takes more time than the additional threads can reduce the processing time.
+
 <img width="600" height="371" alt="Multithread_input" src="https://github.com/user-attachments/assets/683fe816-d47d-4d66-93f5-cebd6bae0f89" />
+
 Input parsing has a negligible impact on runtime compared to file-system overhead. Total execution time scales near-constantly until input length exceeds 110,000 times the base size, after which parsing overhead becomes statistically significant. This is evidenced in the image below.
+
 <img width="600" height="371" alt="Input_lines" src="https://github.com/user-attachments/assets/221513b1-043e-4a05-8cab-e08103439e83" />
+
 The table below indicates the intended improvements to this portion of the project:
 |                            Task description                              |        Status      |
 | :----------------------------------------------------------------------- | :----------------: |
